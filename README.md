@@ -1,2 +1,2 @@
 # convex-sampling
-Constructs linear underestimators of convex functions by tractable sampling in Julia.
+to be written (and not by me!)
