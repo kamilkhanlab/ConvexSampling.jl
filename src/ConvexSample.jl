@@ -162,7 +162,7 @@ function plotter(
         a::Vector{Float64} = vec(fill!(zeros(1,n),0.1))
     )
     #set function definition to speed up computational time:
-    affine = aff_underestimator(f, n, xL, xU)
+    affine = aff_underestimator(f, n, xL, xU;a)
 
     if n == 1
         #sampled points on univariate functions are collinear, so range of points
@@ -187,8 +187,8 @@ function plotter(
         xCoord = [0 0]
         funcyCoord = [0] #to collect function evaluations
         affyCoord = [0] #to collect affine underestimator evaluations
-        for x1 in range(xL[1], xU[1], 100)
-            for x2 in range(xL[2], xU[2], 100)
+        for x1 in range(xL[1], xU[1], 10)
+            for x2 in range(xL[2], xU[2], 10)
                 xCoord = vcat(xCoord, [x1 x2])
                 funcyCoord = vcat(funcyCoord, f([x1, x2]))
                 affyCoord = vcat(affyCoord, affine([x1, x2]))
@@ -201,8 +201,8 @@ function plotter(
         fL = lower_bound(f, n, xL, xU; a)
 
         #to plot along 3 dimensions:
-        surface(xCoord[:,1],xCoord[:,2],fill!(xCoord[:,1],fL), label = "Lower bound", c=:grays)
-        surface!(xCoord[:, 1], xCoord[:,2], affyCoord, label = "Affine underestimator", c=:reds)
+        surface(xCoord[:,1],xCoord[:,2],fill!(xCoord[:,1],fL), label = "Lower bound", c=:reds)
+        wireframe!(range(xL[1], xU[1], 10), range(xL[2], xU[2], 10), affyCoord)
         surface!(xCoord[:, 1], xCoord[:,2], funcyCoord, label = "Function", xlabel = "x axis", ylabel = "y axis", zlabel = "z axis", c=:matter)
     end
 end

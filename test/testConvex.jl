@@ -15,10 +15,9 @@ using Plots
 
 println("Running Example 1: A function with 1 variable:\n")
 
-f2(x) = 2*x.^2
-#Try f(x) = exp(x), f(x) = 0.5/x^^
-xL = [-5.0]
-xU = [5.0]
+f2(x) = (x.^2).*sin.(x)
+xL = [-4.0]
+xU = [0.0]
 
 b_coeff1, c_coeff1 = aff_coefficients(f2, 1, xL, xU)
 println("Calculated b and c coefficients are ", b_coeff1[1], " and ", c_coeff1, " respectively.\n")
@@ -30,9 +29,8 @@ println("At x = ", [2.0], " the affine underestimator outputs ", yOutput1, ".\n"
 fL1 = lower_bound(f2, 1, xL, xU)
 println("The lower bound (fL) is = ", fL1, ".\n")
 
-# println("A 3D plot of the function, lowerbound, and affine underestimator is provided.")
-# graph1 = plotter(f2, 1, xL, xU)
-# @show graph1
+println("A 3D plot of the function, lowerbound, and affine underestimator is provided.")
+graph1 = plotter(f2, 1, xL, xU)
 
 println("Running Example 2: A function with 2 variables:\n")
 
@@ -57,6 +55,6 @@ println("At x = ", [2.0, 2.0], " the affine underestimator outputs ", yOutput, "
 fL = lower_bound(f3,2,xL,xU)
 println("The lower bound (fL) is = ", fL, ".\n")
 
-# graph2 = plotter(f3, 2, xL, xU)
-# println("A 3D plot of the function (multicolor), lowerbound (black), and affine underestimator (red/pink) is provided.")
-# @show graph2
+graph2 = plotter(f3, 2, xL, xU)
+println("A 3D plot of the function (multicolor), lowerbound (red/pink), and affine underestimator (wireframe) is provided.")
+println("Enter @show <graphname> in the command window to access graphs.")
