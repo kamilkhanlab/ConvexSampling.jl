@@ -1,6 +1,6 @@
 # convex-sampling
 
-The `ConvexSampling` module in ConvexSampling.jl provides an implementation in Julia to: 
+The `ConvexSampling` module in [ConvexSampling.jl](src/ConvexSampling.jl) provides an implementation in Julia to: 
 
 - compute affine under-estimators for convex functions using (2n+1) black box function evaluations
 - generate a graphical representation of the convex function and under-estimator
@@ -12,7 +12,7 @@ This implementation doesn't depend on any packages external to Julia. Tested in 
 The following functions are exported by `ConvexSampling`. In each case, `f` may be provided as an anonymous function:
 
 - `(b, c) = aff_coefficients(f::Function, n::Int64, xL::Vector{Float64}, xU::Vector{Float64}; a::Vector{Float64} = vec(fill!(zeros(1,n),0.1)))`:
-  - evaluates the `b` and `c` coefficients as Matrix{Float64} and scalar Float64 respectively where  `b` is the standard centered finite difference approximation of gradient `∇(f(w0))` and `c` resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables.  A special condition for coefficient calculation is set for univariate functions, relying on the collinear sampling of points, based on the proof from Larson et al (2021).
+  - evaluates the `b` and `c` coefficients as Matrix{Float64} and scalar Float64 respectively where  `b` is the centered simplex gradient of `f` at the midpoint `w0` sampled along the coordinate vectors and `c` resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables.  A special condition for coefficient calculation is set for univariate functions, relying on the collinear sampling of points, based on the proof from Larson et al (2021).
 
 - `(x -> c + dot(b, x - w0)) = function aff_underestimator(f::Function, n::Int64, xL::Vector{Float64}, xU::Vector{Float64}; a::Vector{Float64} = vec(fill!(zeros(1,n),0.1)))`
   - returns an anonymous function representing the affine under-estimator based on the calculated `b` and `c` coefficients and the midpoint of the given box domain. 
@@ -59,4 +59,4 @@ Using the `ConvexSampling` module (after `include(“ConvexSampling.jl”)` and 
 
 - Yingkai Song, Huiyi Cao, Chiral Mehta, and Kamil A. Khan, [Bounding convex relaxations of process models from below by tractable black-box sampling]( https://doi.org/10.1016/j.compchemeng.2021.107413), _Computers & Chemical Engineering_, 153:107413, 2021, DOI: 10.1016/j.compchemeng.2021.107413
 
-- Larson, Jeffrey, Sven Leyffer, Prashant Palkar, and Stefan M. Wild, [A method for convex black-box integer global optimization]( https://link.springer.com/article/10.1007/s10898-020-00978-w), _ Journal of Global Optimization_, 80(2):439-77, 2021, DOI: 10.1007/s10898-020-00978-w
+- Larson, Jeffrey, Sven Leyffer, Prashant Palkar, and Stefan M. Wild, [A method for convex black-box integer global optimization]( https://link.springer.com/article/10.1007/s10898-020-00978-w), _Journal of Global Optimization_, 80(2):439-77, 2021, DOI: 10.1007/s10898-020-00978-w
