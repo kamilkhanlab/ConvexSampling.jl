@@ -154,15 +154,22 @@ end
 #  function f on plane (R^n) within box domain
 #  lower bound fL on plane (R^n) within box domain
 #  affine underestimator on plane within box domain
+#  sampled points = (w0,y0) and (wi, yi)
 function plotter(
-        f::Function,
-        n::Int64,
-        xL::Vector{Float64},
-        xU::Vector{Float64};
-        a::Vector{Float64} = vec(fill!(zeros(1,n),0.1))
-    )
+    f::Function,
+    n::Int64,
+    xL::Vector{Float64},
+    xU::Vector{Float64};
+    a::Vector{Float64} = vec(fill!(zeros(1,n),0.1)),
+    style::Vector = [surface!, wireframe!, surface], #Set plot style
+    functionaccuracy::Int64 = 10, #Set number of function evaluations as points^2
+    affineaccuracy::Int64 = 10 #Set number of affine evaluations as points^2
+)
     #set function definition to speed up computational time:
-    affine = aff_underestimator(f, n, xL, xU;a)
+    affine = aff_underestimator(f, n, xL, xU; a)
+    #calculate scalar values:
+    w0, y0, wi, yi = sampled_points(f, n, xL, xU; a)
+    fL = lower_bound(f, n, xL, xU; a)
 
     if n == 1
         #sampled points on univariate functions are collinear, so range of points
@@ -175,35 +182,44 @@ function plotter(
             affyCoord[i] = affine([xCoord[i]])
         end
 
-        fL = lower_bound(f, n, xL, xU; a)
-
         #to plot along 2 dimensions:
         plot(xCoord, funcyCoord, label = "Function", xlabel = "x axis", ylabel = "y axis")
         plot!(xCoord, affyCoord, label = "Affine underestimator")
         plot!(xCoord,fill!(funcyCoord,fL), label = "Lower bound")
+        scatter!([vcat(w0, wi)],[vcat(y0, yi)],label = "Sampled points")
 
     elseif n == 2
-        #for higher dimension functions, a meshgrid of points is required:
-        xCoord = [0 0]
-        funcyCoord = [0] #to collect function evaluations
-        affyCoord = [0] #to collect affine underestimator evaluations
-        for x1 in range(xL[1], xU[1], 10)
-            for x2 in range(xL[2], xU[2], 10)
-                xCoord = vcat(xCoord, [x1 x2])
-                funcyCoord = vcat(funcyCoord, f([x1, x2]))
-                affyCoord = vcat(affyCoord, affine([x1, x2]))
+        #for higher dimension functions, a meshgrid of points is required
+        #as function and affine accuracy may differ, each require individual meshgrids
+        x1frange = range(xL[1], xU[1], functionaccuracy)
+        x2frange = range(xL[2], xU[2], functionaccuracy)
+        funcyCoord = zeros(length(x1frange),length(x2frange))
+        for x1 in 1:length(x1frange)
+            for x2 in 1:length(x2frange)
+                funcyCoord[x1,x2] = f([x1frange[x1],x2frange[x2]])
             end
         end
-        xCoord = xCoord[2:end,:]
-        funcyCoord = funcyCoord[2:end]
-        affyCoord = affyCoord[2:end]
 
-        fL = lower_bound(f, n, xL, xU; a)
+        x1arange = range(xL[1], xU[1], affineaccuracy)
+        x2arange = range(xL[2], xU[2], affineaccuracy)
+        affyCoord = zeros(length(x1arange),length(x2arange))
+        for x1 in 1:length(x1arange)
+            for x2 in 1:length(x2arange)
+                affyCoord[x1,x2] = affine([x1arange[x1],x2arange[x2]])
+            end
+        end
 
         #to plot along 3 dimensions:
-        surface(xCoord[:,1],xCoord[:,2],fill!(xCoord[:,1],fL), label = "Lower bound", c=:reds)
-        wireframe!(range(xL[1], xU[1], 10), range(xL[2], xU[2], 10), affyCoord)
-        surface!(xCoord[:, 1], xCoord[:,2], funcyCoord, label = "Function", xlabel = "x axis", ylabel = "y axis", zlabel = "z axis", c=:matter)
+        style[3](x1frange, x2frange, fill!(zeros(length(x1frange),length(x2frange)),fL), label = "Lower bound", c=:grays)
+        style[2](x1arange, x2arange, affyCoord, label = "Affine underestimator", c=:reds)
+        colorBar = true
+        if style[1] == wireframe!
+            colorBar = false
+        end
+        style[1](x1frange, x2frange, funcyCoord, colorbar=colorBar, title="From top to bottom: (1) Original function,
+        (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
+        xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:matter)
+        scatter!([vcat(w0[1], wi[:,1])], [vcat(w0[2], wi[:,2])], [vcat(y0, yi)],legend=false)
     end
 end
 

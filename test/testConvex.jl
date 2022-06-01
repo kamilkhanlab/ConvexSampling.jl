@@ -15,9 +15,9 @@ using Plots
 
 println("Running Example 1: A function with 1 variable:\n")
 
-f2(x) = (x.^2).*sin.(x)
-xL = [-4.0]
-xU = [0.0]
+f2(x) = (2).*x.^2 .+ (5).*x .+ 3 .+ (2).*abs.(x .- 2)
+xL = [-3.0]
+xU = [3.0]
 
 b_coeff1, c_coeff1 = aff_coefficients(f2, 1, xL, xU)
 println("Calculated b and c coefficients are ", b_coeff1[1], " and ", c_coeff1, " respectively.\n")
