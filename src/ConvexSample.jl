@@ -169,18 +169,21 @@ function plotter(
     if n == 1
         #sampled points on univariate functions are collinear, so range of points
         #is also univariate:
-        xCoord = range(xL[1], xU[1], 100)
-        funcyCoord = zeros(100,1) #to collect function evaluations
-        affyCoord = zeros(100,1) #to collect affine underestimator evaluations
-        for i in 1:length(xCoord)
-            funcyCoord[i] = f(xCoord[i])
-            affyCoord[i] = affine([xCoord[i]])
+        xfCoord = range(xL[1], xU[1], functionaccuracy.^2)
+        xaCoord = range(xL[1], xU[1], affineaccuracy.^2)
+        funcyCoord = zeros(functionaccuracy.^2, 1) #to collect function evaluations
+        affyCoord = zeros(affineaccuracy.^2, 1) #to collect affine underestimator evaluations
+        for (i, xi) in enumerate(xfCoord)
+            funcyCoord[i] = f(xi)
+        end
+        for (i, xi) in enumerate(xaCoord)
+            affyCoord[i] = affine([xi])
         end
 
         #to plot along 2 dimensions:
-        plot(xCoord, funcyCoord, label = "Function", xlabel = "x axis", ylabel = "y axis")
-        plot!(xCoord, affyCoord, label = "Affine underestimator")
-        plot!(xCoord,fill!(funcyCoord,fL), label = "Lower bound")
+        plot(xfCoord, funcyCoord, label = "Function", xlabel = "x axis", ylabel = "y axis")
+        plot!(xaCoord, affyCoord, label = "Affine underestimator")
+        plot!(xfCoord,fill!(funcyCoord,fL), label = "Lower bound")
         scatter!([vcat(w0, wi)],[vcat(y0, yi)],label = "Sampled points")
 
     elseif n == 2
@@ -188,19 +191,19 @@ function plotter(
         #as function and affine accuracy may differ, each require individual meshgrids
         x1frange = range(xL[1], xU[1], functionaccuracy)
         x2frange = range(xL[2], xU[2], functionaccuracy)
-        funcyCoord = zeros(length(x1frange),length(x2frange))
-        for x1 in 1:length(x1frange)
-            for x2 in 1:length(x2frange)
-                funcyCoord[x1,x2] = f([x1frange[x1],x2frange[x2]])
+        funcyCoord = zeros(length(x1frange),length(x2frange)) #to collect function evaluations
+        for (i, x1) in enumerate(x1frange)
+            for (j, x2) in enumerate(x2frange)
+                funcyCoord[i,j] = f([x1, x2])
             end
         end
 
         x1arange = range(xL[1], xU[1], affineaccuracy)
         x2arange = range(xL[2], xU[2], affineaccuracy)
-        affyCoord = zeros(length(x1arange),length(x2arange))
-        for x1 in 1:length(x1arange)
-            for x2 in 1:length(x2arange)
-                affyCoord[x1,x2] = affine([x1arange[x1],x2arange[x2]])
+        affyCoord = zeros(length(x1arange),length(x2arange)) #to collect affine underestimator evaluations
+        for (i, x1) in enumerate(x1arange)
+            for (j, x2) in enumerate(x2arange)
+                affyCoord[i,j] = affine([x1, x2])
             end
         end
 
@@ -215,6 +218,9 @@ function plotter(
         (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
         xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:dense)
         scatter!([vcat(w0[1], wi[:,1])], [vcat(w0[2], wi[:,2])], [vcat(y0, yi)],legend=false)
+
+    else n > 2
+        throw(DomainError("function dimension: must be less than 2"))
     end
 end
 

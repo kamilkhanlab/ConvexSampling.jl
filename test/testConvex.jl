@@ -37,7 +37,7 @@ graph1 = plotter(f2, xL, xU)
 println("Running Example 2: A function with 2 variables:\n")
 
 f3(x) = dot(x,([65 56; 56 65]),x) + dot([6; 2],x) + 23
-xL = [-5.0, -3.0]
+xL = [-5.0, -2.0]
 xU = [5.0, 3.0]
 println("Function: f3(x) = dot(x,(",[65 56; 56 65],"),x) + dot(",[6;2],",x) + ",23," \n with bounds x = ",xL," and ",xU,".\n")
 
