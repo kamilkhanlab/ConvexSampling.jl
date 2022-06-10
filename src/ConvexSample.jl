@@ -3,58 +3,67 @@ module ConvexSample
 =====================
 A quick implementation of:
 
-- bounding convex relaxations of process models from below by
+- Bounding convex relaxations of process models from below by
 tractable black-box sampling, developed in the article:
-KA Khan et al (2021),https://doi.org/10.1016/j.compchemeng.2021.107413
+Song et al. (2021),
+https://doi.org/10.1016/j.compchemeng.2021.107413
 
-This implementation applies theorem 1 and 2 to calculate affine relaxations of
-a convex function on a box domain.
+This implementation applies the formulae in this article to calculate affine
+relaxations of a convex function on a box domain.
 
 ...
 
 Written by Maha Chaudhry on May 25, 2022
 =#
-module ConvexSample
+module SamplingUnderestimators
 
 using LinearAlgebra
 using Plots
 
-export aff_coefficients,
-    aff_underestimator,
-    aff_underestimator_atx,
-    lower_bound,
-    plotter
+export eval_sampling_underestimator_coeffs,
+    construct_sampling_underestimator,
+    eval_sampling_underestimator,
+    eval_sampling_lower_bound,
+    plot_sampling_underestimator
 
 ## define affine under-estimator function operations, given a convex function f
 ## defined on a box domain with a Vector input
 
+#default step size (alpha)
+#small alphas generates tighter relaxations, but the smaller it gets, the larger
+#the source of error introduced into calculation
+const DEFAULT_ALPHA = 0.1
+
 # compute 2n+1 sampled values required to construct affine relaxation:
 #   (w0,y0) = midpoint of the box domain
 #   (wi,y0) = 2n points along defined step lengths (α)
-function sampled_points(
+function sample_convex_function(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(0.1, length(xL)) #sets default value for α
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)) #sets default value for α
     )
     n = length(xL) #function dimension
+    if length(xU) != n
+        throw(DomainError("function dimension: length of xL and xU must be equal"))
+    end
+
     w0 = 0.5*(xL + xU)
     y0 = f(w0)
 
     #define matrix of unit coordinator vectors in R^n:
     e = Matrix(I, n, n)
 
-    #structure of wi and yi set to i = [+1, -1, +2, -2, ...]
-    yi = zeros(2*n,1)
-    wi = zeros(2*n,n)
-    for i in 2*range(1,n)
-        wpos = w0 + ((1)*0.5*alpha[i÷2]*(xU[i÷2] - xL[i÷2])).*e[i÷2,:]
-        wneg = w0 + ((-1)*0.5*alpha[i÷2]*(xU[i÷2] - xL[i÷2])).*e[i÷2,:]
-        wi[i-1:i,1:n] = [wpos'; wneg']
-        yi[i-1:i] = [f(wpos);f(wneg)]
+    wStep = zeros(n,n)
+    yPlus = zeros(n,1)
+    yMinus = zeros(n,1)
+    for i in range(1,n)
+        wStep[i,1:n] = 0.5*alpha[i]*(xU[i] - xL[i]).*e[i,:]
+        yPlus[i] = f(w0 + wStep[i,1:n])[1]
+        yMinus[i] = f(w0 - wStep[i,1:n])[1]
     end
 
-    return w0, y0, wi, yi
+    return w0, y0, wStep, yPlus, yMinus
 end
 
 # compute coefficients for affine underestimator function where:
@@ -63,19 +72,19 @@ end
 #                   along coordinate vectors
 #   coefficient c = resembles standard difference approximation of
 #                   second-order partial derivatives
-function aff_coefficients(
+function eval_sampling_underestimator_coeffs(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(0.1, length(xL))
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
     )
     n = length(xL)
-    w0, y0, wi, yi = sampled_points(f, xL, xU; alpha)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
 
     b = zeros(n,1)
-    if all(xL .< xU)
+    if all(xL .< xU .|| xL .== xU)
         for i in range(1,n)
-            b[i] = (yi[2*i-1] - yi[2*i])/maximum(abs.(wi[2*i-1,:]-wi[2*i,:]))
+            b[i] = (yPlus[i] - yMinus[i])/maximum(abs.((2.0.*wStep[i, 1:n])))
         end
     end
 
@@ -83,64 +92,60 @@ function aff_coefficients(
     #dependent on the defined step length:
     c = y0[1]
     if n > 1
-        for i in 2*range(1,n)
-            c = c - 0.5*((yi[i-1]+yi[i]-2y0)/alpha[i÷2])
+        for i in range(1,n)
+            c -= 0.5*((yPlus[i]+yMinus[i]-2*y0)/alpha[i])
         end
-    elseif n == 1 && alpha != 1
-        c = 2*c - 0.5*(yi[1]+yi[2])
+    elseif n == 1 && alpha != [1.0]
+        c = 2*c - 0.5*(yPlus[1]+yMinus[1])
     end
-    return b, c
+    return w0, b, c
 end
 
 # define affine underestimator function using calculated b, c coefficients:
-function aff_underestimator(
+function construct_sampling_underestimator(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(0.1, length(xL))
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
     )
     n = length(xL)
-    b, c = aff_coefficients(f, xL, xU; alpha)
-    w0 = 0.5*(xL + xU)
-    #structure of function is f(x) = c + dot(b, x - w0)
-    func(x) = c + dot(b, x - w0)
-    return func
+    w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU; alpha)
+    return x -> c + dot(b, x - w0)
 end
 
 # compute affine underestimator y-value using:
 #  (1) computed affine underestimator function
 #  (2) x-input value
-function aff_underestimator_atx(
+function eval_sampling_underestimator(
     f::Function,
     xL::Vector{Float64},
     xU::Vector{Float64},
-    xInput::Vector{Float64}; #define x-input value
-    alpha::Vector{Float64} = fill(0.1, length(xL))
+    xIn::Vector{Float64}; #define x-input value
+    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
 )
-    affinefunc = aff_underestimator(f, xL, xU; alpha)
-    yOutput = affinefunc(xInput)
-    return yOutput
+    affinefunc = construct_sampling_underestimator(f,xL,xU;alpha)
+    return affinefunc(xIn)
 end
 
 # compute:
 #  fL = guaranteed constant scalar lower bound of f on X
-function lower_bound(
+function eval_sampling_lower_bound(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(0.1, length(xL))
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
     )
     n = length(xL)
-    w0, y0, wi, yi = sampled_points(f, xL, xU; alpha)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
 
     #coefficient c can be tightened in special cases where f is univariate:
     if n > 1
         fL = y0
-        for i in 2*range(1,n)
-            fL = fL - (max(yi[i-1], yi[i])-y0)/alpha[i÷2]
+        for i in range(1,n)
+            fL -= (max(yPlus[i], yMinus[i])-y0)/alpha[i]
         end
     elseif n == 1
-        fL = min(2*y0[1]-yi[1], 2*y0[1]-yi[2], (1/alpha[1])*yi[2]-((1-alpha[1])/alpha[1])*y0[1], (1/alpha[1])*yi[1]-((1-alpha[1])/alpha[1])*y0[1])
+        fL = (@. min(2*y0-yPlus, 2*y0-yMinus, (1/alpha)*yMinus-((1-alpha)/alpha)*y0, (1/alpha)*yPlus-((1-alpha)/alpha)*y0))[1]
     end
     return fL
 end
@@ -150,78 +155,73 @@ end
 #  lower bound fL on plane (R^n) within box domain
 #  affine underestimator on plane within box domain
 #  sampled points = (w0,y0) and (wi, yi)
-function plotter(
+function plot_sampling_underestimator(
     f::Function,
     xL::Vector{Float64},
     xU::Vector{Float64};
-    alpha::Vector{Float64} = fill(0.1, length(xL)),
+    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
     style::Vector = [surface!, wireframe!, surface], #Set plot style
-    functionaccuracy::Int64 = 10, #Set number of function evaluations as points^2
-    affineaccuracy::Int64 = 10 #Set number of affine evaluations as points^2
+    fEvalResolution::Int64 = 10, #Set # of function evaluations as points^n
 )
+    if !all(xU .> xL)
+        throw(DomainError("function dimension: individual components of xU must be greater than individual components of xL"))
+    end
+
     n = length(xL)
     #set function definition to speed up computational time:
-    affine = aff_underestimator(f, xL, xU; alpha)
+    affine = construct_sampling_underestimator(f, xL, xU; alpha)
     #calculate scalar values:
-    w0, y0, wi, yi = sampled_points(f, xL, xU; alpha)
-    fL = lower_bound(f, xL, xU; alpha)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
+    fL = eval_sampling_lower_bound(f, xL, xU; alpha)
 
     if n == 1
         #sampled points on univariate functions are collinear, so range of points
         #is also univariate:
-        xfCoord = range(xL[1], xU[1], functionaccuracy.^2)
-        xaCoord = range(xL[1], xU[1], affineaccuracy.^2)
-        funcyCoord = zeros(functionaccuracy.^2, 1) #to collect function evaluations
-        affyCoord = zeros(affineaccuracy.^2, 1) #to collect affine underestimator evaluations
-        for (i, xi) in enumerate(xfCoord)
-            funcyCoord[i] = f(xi)
-        end
-        for (i, xi) in enumerate(xaCoord)
-            affyCoord[i] = affine([xi])
+        xMesh = range(xL[1], xU[1], fEvalResolution)
+        yMeshF = zeros(fEvalResolution,1) #to collect function evaluations
+        yMeshAffine = zeros(fEvalResolution,1) #to collect affine underestimator evaluations
+        for (i, xi) in enumerate(xMesh)
+            yMeshF[i] = f(xi)
+            yMeshAffine[i] = affine([xi])
         end
 
         #to plot along 2 dimensions:
-        plot(xfCoord, funcyCoord, label = "Function", xlabel = "x axis", ylabel = "y axis")
-        plot!(xaCoord, affyCoord, label = "Affine underestimator")
-        plot!(xfCoord,fill!(funcyCoord,fL), label = "Lower bound")
-        scatter!([vcat(w0, wi)],[vcat(y0, yi)],label = "Sampled points")
+        plot(xMesh, yMeshF, label = "Function", xlabel = "x axis", ylabel = "y axis")
+        plot!(xMesh, yMeshAffine, label = "Affine underestimator")
+        plot!(xMesh, fill!(yMeshF,fL), label = "Lower bound")
+        scatter!([w0; w0 + wStep; w0 - wStep], [y0; yPlus; yMinus], label = "Sampled points")
 
     elseif n == 2
         #for higher dimension functions, a meshgrid of points is required
         #as function and affine accuracy may differ, each require individual meshgrids
-        x1frange = range(xL[1], xU[1], functionaccuracy)
-        x2frange = range(xL[2], xU[2], functionaccuracy)
-        funcyCoord = zeros(length(x1frange),length(x2frange)) #to collect function evaluations
-        for (i, x1) in enumerate(x1frange)
-            for (j, x2) in enumerate(x2frange)
-                funcyCoord[i,j] = f([x1, x2])
-            end
-        end
-
-        x1arange = range(xL[1], xU[1], affineaccuracy)
-        x2arange = range(xL[2], xU[2], affineaccuracy)
-        affyCoord = zeros(length(x1arange),length(x2arange)) #to collect affine underestimator evaluations
-        for (i, x1) in enumerate(x1arange)
-            for (j, x2) in enumerate(x2arange)
-                affyCoord[i,j] = affine([x1, x2])
+        x1range = range(xL[1], xU[1], fEvalResolution)
+        x2range = range(xL[2], xU[2], fEvalResolution)
+        yMeshF = zeros(length(x1range),length(x2range)) #to collect function evaluations
+        yMeshAffine = zeros(length(x1range),length(x2range)) #to collect affine underestimator evaluations
+        for (i, x1) in enumerate(x1range)
+            for (j, x2) in enumerate(x2range)
+                yMeshF[i,j] = f([x1, x2])
+                yMeshAffine[i,j] = affine([x1, x2])
             end
         end
 
         #to plot along 3 dimensions:
-        style[3](x1frange, x2frange, fill(fL, length(x1frange), length(x2frange)), label = "Lower bound", c=:PRGn_4)
-        style[2](x1arange, x2arange, affyCoord, label = "Affine underestimator", c=:grays)
+        style[3](x1range, x2range, fill(fL, length(x1range), length(x2range)), label = "Lower bound", c=:PRGn_3)
+        style[2](x1range, x2range, yMeshAffine, label = "Affine underestimator", c=:grays)
         colorBar = true
         if style[1] == wireframe!
             colorBar = false
         end
-        style[1](x1frange, x2frange, funcyCoord, colorbar=colorBar, title="From top to bottom: (1) Original function,
+        style[1](x1range, x2range, yMeshF, colorbar=colorBar, title="From top to bottom: (1) Original function,
         (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
         xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:dense)
-        scatter!([vcat(w0[1], wi[:,1])], [vcat(w0[2], wi[:,2])], [vcat(y0, yi)],legend=false)
+        wPlus = (w0' .+ wStep)
+        wMinus = (w0' .- wStep)
+        scatter!([w0[1]; wPlus[:,1]; wMinus[:,1]]', [w0[2]; wPlus[:,2]; wMinus[:,2]]', [y0; yPlus; yMinus]', c=:purple, legend=false)
 
-    else n > 2
-        throw(DomainError("function dimension: must be less than 2"))
+    else n > 2 || n == 0
+        throw(DomainError("function dimension: must be 1 or 2"))
     end
 end
 
-end
+end #module
