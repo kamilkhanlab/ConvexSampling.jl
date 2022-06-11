@@ -54,17 +54,16 @@ function sample_convex_function(
     #define matrix of unit coordinator vectors in R^n:
     e = Matrix(I, n, n)
 
-    wStep = zeros(n,n)
-    yPlus = zeros(n,1)
-    yMinus = zeros(n,1)
-    for i in range(1,n)
-        wStep[i,1:n] = 0.5*alpha[i]*(xU[i] - xL[i]).*e[i,:]
-        yPlus[i] = f(w0 + wStep[i,1:n])[1]
-        yMinus[i] = f(w0 - wStep[i,1:n])[1]
-    end
+    wStep = @. 0.5*alpha*(xU - xL)
+    yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ diagm(wStep))]
+    yMinus = [f(wMinus) for wMinus in eachcol(w0 .- diagm(wStep))]
 
-    return w0, y0, wStep, yPlus, yMinus
-end
+    if n == 1
+        return w0, y0, wStep, yPlus[1], yMinus[1]
+    else
+        return w0, y0, wStep, yPlus, yMinus
+    end
+end #function
 
 # compute coefficients for affine underestimator function where:
 # f(x) = c + dot(b, x - w0)
@@ -82,9 +81,9 @@ function eval_sampling_underestimator_coeffs(
     w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
 
     b = zeros(n,1)
-    if all(xL .< xU .|| xL .== xU)
-        for i in range(1,n)
-            b[i] = (yPlus[i] - yMinus[i])/maximum(abs.((2.0.*wStep[i, 1:n])))
+    for (i, bi) in enumerate(b)
+        if (xL[i] < xU[i]) || (xL[i] == xU[i])
+            b[i] = ((yPlus[i] - yMinus[i])/maximum(abs.(2.0.*diagm(wStep)[i,:])))
         end
     end
 
@@ -99,7 +98,7 @@ function eval_sampling_underestimator_coeffs(
         c = 2*c - 0.5*(yPlus[1]+yMinus[1])
     end
     return w0, b, c
-end
+end #function
 
 # define affine underestimator function using calculated b, c coefficients:
 function construct_sampling_underestimator(
@@ -125,7 +124,7 @@ function eval_sampling_underestimator(
 )
     affinefunc = construct_sampling_underestimator(f,xL,xU;alpha)
     return affinefunc(xIn)
-end
+end #function
 
 # compute:
 #  fL = guaranteed constant scalar lower bound of f on X
@@ -148,7 +147,7 @@ function eval_sampling_lower_bound(
         fL = (@. min(2*y0-yPlus, 2*y0-yMinus, (1/alpha)*yMinus-((1-alpha)/alpha)*y0, (1/alpha)*yPlus-((1-alpha)/alpha)*y0))[1]
     end
     return fL
-end
+end #function
 
 # plot:
 #  function f on plane (R^n) within box domain
@@ -160,7 +159,7 @@ function plot_sampling_underestimator(
     xL::Vector{Float64},
     xU::Vector{Float64};
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-    style::Vector = [surface!, wireframe!, surface], #Set plot style
+    plot3DStyle::Vector = [surface!, wireframe!, surface], #Set plot style
     fEvalResolution::Int64 = 10, #Set # of function evaluations as points^n
 )
     if !all(xU .> xL)
@@ -206,22 +205,22 @@ function plot_sampling_underestimator(
         end
 
         #to plot along 3 dimensions:
-        style[3](x1range, x2range, fill(fL, length(x1range), length(x2range)), label = "Lower bound", c=:PRGn_3)
-        style[2](x1range, x2range, yMeshAffine, label = "Affine underestimator", c=:grays)
+        plot3DStyle[3](x1range, x2range, fill(fL, length(x1range), length(x2range)), label = "Lower bound", c=:PRGn_3)
+        plot3DStyle[2](x1range, x2range, yMeshAffine, label = "Affine underestimator", c=:grays)
         colorBar = true
-        if style[1] == wireframe!
+        if plot3DStyle[1] == wireframe!
             colorBar = false
         end
-        style[1](x1range, x2range, yMeshF, colorbar=colorBar, title="From top to bottom: (1) Original function,
+        plot3DStyle[1](x1range, x2range, yMeshF, colorbar=colorBar, title="From top to bottom: (1) Original function,
         (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
         xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:dense)
-        wPlus = (w0' .+ wStep)
-        wMinus = (w0' .- wStep)
-        scatter!([w0[1]; wPlus[:,1]; wMinus[:,1]]', [w0[2]; wPlus[:,2]; wMinus[:,2]]', [y0; yPlus; yMinus]', c=:purple, legend=false)
+        wPlus = w0 .+ diagm(wStep)
+        wMinus= w0 .- diagm(wStep)
+        scatter!([w0[1]; wPlus[1,:]; wMinus[1,:]], [w0[2]; wPlus[2,:]; wMinus[2,:]], [y0; yPlus; yMinus], c=:purple, legend=false)
 
-    else n > 2 || n == 0
+    else
         throw(DomainError("function dimension: must be 1 or 2"))
     end
-end
+end #function
 
 end #module
