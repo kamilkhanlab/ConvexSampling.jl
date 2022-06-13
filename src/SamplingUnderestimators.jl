@@ -13,7 +13,7 @@ relaxations of a convex function on a box domain.
 
 ...
 
-Written by Maha Chaudhry on May 25, 2022
+Written by Maha Chaudhry on June 13, 2022
 =#
 module SamplingUnderestimators
 
@@ -38,7 +38,7 @@ const DEFAULT_ALPHA = 0.1
 #   (w0,y0) = midpoint of the box domain
 #   (wi,y0) = 2n points along defined step lengths (α)
 function sample_convex_function(
-        f::Function,
+        f::Function, #functions must accept Vector{Float64} inputs and output scalar Float64
         xL::Vector{Float64},
         xU::Vector{Float64};
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)) #sets default value for α
@@ -50,19 +50,15 @@ function sample_convex_function(
 
     w0 = 0.5*(xL + xU)
     y0 = f(w0)
-
-    #define matrix of unit coordinator vectors in R^n:
-    e = Matrix(I, n, n)
+    if typeof(y0) != Float64
+        throw(DomainError("function dimension: function output must be scalar Float64"))
+    end
 
     wStep = @. 0.5*alpha*(xU - xL)
     yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ diagm(wStep))]
     yMinus = [f(wMinus) for wMinus in eachcol(w0 .- diagm(wStep))]
 
-    if n == 1
-        return w0, y0, wStep, yPlus[1], yMinus[1]
-    else
-        return w0, y0, wStep, yPlus, yMinus
-    end
+    return w0, y0, wStep, yPlus, yMinus
 end #function
 
 # compute coefficients for affine underestimator function where:
@@ -84,19 +80,19 @@ function eval_sampling_underestimator_coeffs(
     for (i, bi) in enumerate(b)
         if (xL[i] < xU[i]) || (xL[i] == xU[i])
             b[i] = ((yPlus[i] - yMinus[i])/maximum(abs.(2.0.*diagm(wStep)[i,:])))
-        end
-    end
+        end #if
+    end #for
 
     #coefficient c can be tightened in special cases where f is univariate
     #dependent on the defined step length:
     c = y0[1]
     if n > 1
         for i in range(1,n)
-            c -= 0.5*((yPlus[i]+yMinus[i]-2*y0)/alpha[i])
-        end
+            c -= 0.5*((yPlus[i]+yMinus[i]-2.0*y0)/alpha[i])
+        end #for
     elseif n == 1 && alpha != [1.0]
-        c = 2*c - 0.5*(yPlus[1]+yMinus[1])
-    end
+        c = 2.0*c - 0.5*(yPlus[1]+yMinus[1])
+    end #if
     return w0, b, c
 end #function
 
@@ -110,7 +106,7 @@ function construct_sampling_underestimator(
     n = length(xL)
     w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU; alpha)
     return x -> c + dot(b, x - w0)
-end
+end #function
 
 # compute affine underestimator y-value using:
 #  (1) computed affine underestimator function
@@ -142,10 +138,12 @@ function eval_sampling_lower_bound(
         fL = y0
         for i in range(1,n)
             fL -= (max(yPlus[i], yMinus[i])-y0)/alpha[i]
-        end
+        end #for
     elseif n == 1
-        fL = (@. min(2*y0-yPlus, 2*y0-yMinus, (1/alpha)*yMinus-((1-alpha)/alpha)*y0, (1/alpha)*yPlus-((1-alpha)/alpha)*y0))[1]
-    end
+        fL = (@. min(2.0*y0-yPlus, 2.0*y0-yMinus,
+            (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
+            (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
+    end #if
     return fL
 end #function
 
@@ -182,7 +180,7 @@ function plot_sampling_underestimator(
         for (i, xi) in enumerate(xMesh)
             yMeshF[i] = f(xi)
             yMeshAffine[i] = affine([xi])
-        end
+        end #for
 
         #to plot along 2 dimensions:
         plot(xMesh, yMeshF, label = "Function", xlabel = "x axis", ylabel = "y axis")
@@ -201,26 +199,30 @@ function plot_sampling_underestimator(
             for (j, x2) in enumerate(x2range)
                 yMeshF[i,j] = f([x1, x2])
                 yMeshAffine[i,j] = affine([x1, x2])
-            end
-        end
+            end #for
+        end #for
 
         #to plot along 3 dimensions:
-        plot3DStyle[3](x1range, x2range, fill(fL, length(x1range), length(x2range)), label = "Lower bound", c=:PRGn_3)
-        plot3DStyle[2](x1range, x2range, yMeshAffine, label = "Affine underestimator", c=:grays)
+        plot3DStyle[3](x1range, x2range, fill(fL, length(x1range), length(x2range)),
+            label = "Lower bound", c=:PRGn_3)
+        plot3DStyle[2](x1range, x2range, yMeshAffine,
+            label = "Affine underestimator", c=:grays)
         colorBar = true
         if plot3DStyle[1] == wireframe!
             colorBar = false
-        end
-        plot3DStyle[1](x1range, x2range, yMeshF, colorbar=colorBar, title="From top to bottom: (1) Original function,
-        (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
-        xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:dense)
+        end #if
+        plot3DStyle[1](x1range, x2range, yMeshF, colorbar=colorBar,
+            title="From top to bottom: (1) Original function,
+            (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
+            xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:dense)
         wPlus = w0 .+ diagm(wStep)
         wMinus= w0 .- diagm(wStep)
-        scatter!([w0[1]; wPlus[1,:]; wMinus[1,:]], [w0[2]; wPlus[2,:]; wMinus[2,:]], [y0; yPlus; yMinus], c=:purple, legend=false)
+        scatter!([w0[1]; wPlus[1,:]; wMinus[1,:]], [w0[2]; wPlus[2,:]; wMinus[2,:]], [y0; yPlus; yMinus],
+            c=:purple, legend=false)
 
     else
         throw(DomainError("function dimension: must be 1 or 2"))
-    end
+    end #if
 end #function
 
 end #module
