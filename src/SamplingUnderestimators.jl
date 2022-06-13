@@ -41,14 +41,20 @@ function sample_convex_function(
         f::Function, #functions must accept Vector{Float64} inputs and output scalar Float64
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)) #sets default value for α
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), #sets default value for α
+        lambda::Float64 = 0.0, #accomodates offset of sampled midpoint
+        epsilon::Float64 = 0.0 #accounts for error in function evaluations
     )
+    if (1.0 - lambda) <= 0.0
+        throw(DomainError("function dimension: alpha out of range of (0.0, 1.0-lambda)"))
+    end
+
     n = length(xL) #function dimension
     if length(xU) != n
         throw(DomainError("function dimension: length of xL and xU must be equal"))
     end
 
-    w0 = 0.5*(xL + xU)
+    w0 = @. 0.5*(1 + lambda)*(xL + xU)
     y0 = f(w0)
     if typeof(y0) != Float64
         throw(DomainError("function dimension: function output must be scalar Float64"))
@@ -71,10 +77,12 @@ function eval_sampling_underestimator_coeffs(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
     )
     n = length(xL)
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha, lambda, epsilon)
 
     b = zeros(n,1)
     for (i, bi) in enumerate(b)
@@ -87,11 +95,13 @@ function eval_sampling_underestimator_coeffs(
     #dependent on the defined step length:
     c = y0[1]
     if n > 1
+        c -= epsilon
         for i in range(1,n)
-            c -= 0.5*((yPlus[i]+yMinus[i]-2.0*y0)/alpha[i])
+            c -= ((1 + abs(lambda))*(yPlus[i] + yMinus[i]
+                - 2.0*y0 + 4.0*epsilon))/(2.0*alpha[i])
         end #for
     elseif n == 1 && alpha != [1.0]
-        c = 2.0*c - 0.5*(yPlus[1]+yMinus[1])
+        c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
     end #if
     return w0, b, c
 end #function
@@ -101,10 +111,12 @@ function construct_sampling_underestimator(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
     )
     n = length(xL)
-    w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU; alpha)
+    w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU; alpha, lambda, epsilon)
     return x -> c + dot(b, x - w0)
 end #function
 
@@ -116,9 +128,11 @@ function eval_sampling_underestimator(
     xL::Vector{Float64},
     xU::Vector{Float64},
     xIn::Vector{Float64}; #define x-input value
-    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
+    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
+    lambda::Float64 = 0.0,
+    epsilon::Float64 = 0.0
 )
-    affinefunc = construct_sampling_underestimator(f,xL,xU;alpha)
+    affinefunc = construct_sampling_underestimator(f, xL, xU; alpha, lambda, epsilon)
     return affinefunc(xIn)
 end #function
 
@@ -128,21 +142,28 @@ function eval_sampling_lower_bound(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL))
+        alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
     )
     n = length(xL)
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha, lambda, epsilon)
 
     #coefficient c can be tightened in special cases where f is univariate:
     if n > 1
-        fL = y0
+        fL = y0 - epsilon
         for i in range(1,n)
-            fL -= (max(yPlus[i], yMinus[i])-y0)/alpha[i]
+            fL -= ((1 + abs(lambda))*(max(yPlus[i], yMinus[i])
+                - y0 + 2.0*epsilon))/alpha[i]
         end #for
-    elseif n == 1
+    elseif n == 1 && (lambda == 0.0 && epsilon == 0.0)
         fL = (@. min(2.0*y0-yPlus, 2.0*y0-yMinus,
             (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
             (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
+    elseif n == 1 && (lambda != 0.0 || epsilon != 0.0)
+        fL = (@. min(2*y0-yPlus, 2*y0-yMinus,
+                    (2*(yMinus-y0)*(w0-xL))/(alpha*(xU-xL)),
+                    (2*(yPlus-y0)*(xU-w0))/(alpha*(xU-xL))))[1]
     end #if
     return fL
 end #function
@@ -157,6 +178,8 @@ function plot_sampling_underestimator(
     xL::Vector{Float64},
     xU::Vector{Float64};
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
+    lambda::Float64 = 0.0,
+    epsilon::Float64 = 0.0,
     plot3DStyle::Vector = [surface!, wireframe!, surface], #Set plot style
     fEvalResolution::Int64 = 10, #Set # of function evaluations as points^n
 )
@@ -166,10 +189,10 @@ function plot_sampling_underestimator(
 
     n = length(xL)
     #set function definition to speed up computational time:
-    affine = construct_sampling_underestimator(f, xL, xU; alpha)
+    affine = construct_sampling_underestimator(f, xL, xU; alpha, lambda, epsilon)
     #calculate scalar values:
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha)
-    fL = eval_sampling_lower_bound(f, xL, xU; alpha)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha, lambda, epsilon)
+    fL = eval_sampling_lower_bound(f, xL, xU; alpha, lambda, epsilon)
 
     if n == 1
         #sampled points on univariate functions are collinear, so range of points
