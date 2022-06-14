@@ -42,16 +42,18 @@ function sample_convex_function(
         xL::Vector{Float64},
         xU::Vector{Float64};
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), #sets default value for α
-        lambda::Float64 = 0.0, #accomodates offset of sampled midpoint
+        lambda::Vector{Float64} = zeros(length(xL)), #accomodates offset of sampled midpoint
         epsilon::Float64 = 0.0 #accounts for error in function evaluations
     )
-    if (1.0 - lambda) <= 0.0
-        throw(DomainError("function dimension: alpha out of range of (0.0, 1.0-lambda)"))
-    end
-
     n = length(xL) #function dimension
+
+    #domain error checks
     if length(xU) != n
         throw(DomainError("function dimension: length of xL and xU must be equal"))
+    elseif any(alpha .> (1.0 .- lambda)) || any(alpha .<= 0.0)
+        throw(DomainError("function dimension: alpha out of range of (0.0, 1.0-lambda)"))
+    elseif any(lambda .<= -1.0) || any(lambda .>= 1.0)
+        throw(DomainError("function dimension: lambda out of range of (-1.0, 1.0)"))
     end
 
     w0 = @. 0.5*(1 + lambda)*(xL + xU)
@@ -67,6 +69,18 @@ function sample_convex_function(
     return w0, y0, wStep, yPlus, yMinus
 end #function
 
+# compute sampled values using scalar inputs for univariate functions
+function sample_convex_function(
+        f::Function, #functions must accept Vector{Float64} inputs and output scalar Float64
+        xL::Float64,
+        xU::Float64;
+        alpha::Float64 = DEFAULT_ALPHA,
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
+    )
+    sample_convex_function(f, [xL], [xU]; alpha = [alpha], lambda = [lambda], epsilon)
+end #function
+
 # compute coefficients for affine underestimator function where:
 # f(x) = c + dot(b, x - w0)
 #   coefficient b = centered simplex gradient of f at w0 sampled
@@ -78,7 +92,7 @@ function eval_sampling_underestimator_coeffs(
         xL::Vector{Float64},
         xU::Vector{Float64};
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-        lambda::Float64 = 0.0,
+        lambda::Vector{Float64} = zeros(length(xL)),
         epsilon::Float64 = 0.0
     )
     n = length(xL)
@@ -97,7 +111,7 @@ function eval_sampling_underestimator_coeffs(
     if n > 1
         c -= epsilon
         for i in range(1,n)
-            c -= ((1 + abs(lambda))*(yPlus[i] + yMinus[i]
+            c -= ((1.0 + abs(lambda[i]))*(yPlus[i] + yMinus[i]
                 - 2.0*y0 + 4.0*epsilon))/(2.0*alpha[i])
         end #for
     elseif n == 1 && alpha != [1.0]
@@ -106,18 +120,42 @@ function eval_sampling_underestimator_coeffs(
     return w0, b, c
 end #function
 
+# compute coefficients using scalar inputs for univariate functions:
+function eval_sampling_underestimator_coeffs(
+        f::Function,
+        xL::Float64,
+        xU::Float64;
+        alpha::Float64 = DEFAULT_ALPHA,
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
+    )
+    eval_sampling_underestimator_coeffs(f, [xL], [xU]; alpha = [alpha], lambda = [lambda], epsilon)
+end #function
+
 # define affine underestimator function using calculated b, c coefficients:
 function construct_sampling_underestimator(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-        lambda::Float64 = 0.0,
+        lambda::Vector{Float64} = zeros(length(xL)),
         epsilon::Float64 = 0.0
     )
     n = length(xL)
     w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU; alpha, lambda, epsilon)
     return x -> c + dot(b, x - w0)
+end #function
+
+# define affine underestimator function using scalar inputs for univariate functions:
+function construct_sampling_underestimator(
+        f::Function,
+        xL::Float64,
+        xU::Float64;
+        alpha::Float64 = DEFAULT_ALPHA,
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
+    )
+    construct_sampling_underestimator(f, [xL], [xU]; alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # compute affine underestimator y-value using:
@@ -129,11 +167,24 @@ function eval_sampling_underestimator(
     xU::Vector{Float64},
     xIn::Vector{Float64}; #define x-input value
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-    lambda::Float64 = 0.0,
+    lambda::Vector{Float64} = zeros(length(xL)),
     epsilon::Float64 = 0.0
 )
     affinefunc = construct_sampling_underestimator(f, xL, xU; alpha, lambda, epsilon)
     return affinefunc(xIn)
+end #function
+
+# affine underestimator y-value using scalar inputs for univariate functions:
+function eval_sampling_underestimator(
+        f::Function,
+        xL::Float64,
+        xU::Float64,
+        xIn::Float64;
+        alpha::Float64 = DEFAULT_ALPHA,
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
+    )
+    eval_sampling_underestimator(f, [xL], [xU], [xIn]; alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # compute:
@@ -143,29 +194,37 @@ function eval_sampling_lower_bound(
         xL::Vector{Float64},
         xU::Vector{Float64};
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-        lambda::Float64 = 0.0,
+        lambda::Vector{Float64} = zeros(length(xL)),
         epsilon::Float64 = 0.0
     )
     n = length(xL)
     w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; alpha, lambda, epsilon)
 
     #coefficient c can be tightened in special cases where f is univariate:
-    if n > 1
+    if n > 1 || lambda != zeros(n) || epsilon != zeros(n)
         fL = y0 - epsilon
         for i in range(1,n)
-            fL -= ((1 + abs(lambda))*(max(yPlus[i], yMinus[i])
+            fL -= ((1.0 + abs(lambda[i]))*(max(yPlus[i], yMinus[i])
                 - y0 + 2.0*epsilon))/alpha[i]
         end #for
-    elseif n == 1 && (lambda == 0.0 && epsilon == 0.0)
+    elseif n == 1
         fL = (@. min(2.0*y0-yPlus, 2.0*y0-yMinus,
             (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
             (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
-    elseif n == 1 && (lambda != 0.0 || epsilon != 0.0)
-        fL = (@. min(2*y0-yPlus, 2*y0-yMinus,
-                    (2*(yMinus-y0)*(w0-xL))/(alpha*(xU-xL)),
-                    (2*(yPlus-y0)*(xU-w0))/(alpha*(xU-xL))))[1]
     end #if
     return fL
+end #function
+
+# compute lower bound using scalar inputs for univariate functions:
+function eval_sampling_lower_bound(
+        f::Function,
+        xL::Float64,
+        xU::Float64;
+        alpha::Float64 = DEFAULT_ALPHA,
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0
+    )
+    eval_sampling_lower_bound(f, [xL], [xU]; alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # plot:
@@ -178,7 +237,7 @@ function plot_sampling_underestimator(
     xL::Vector{Float64},
     xU::Vector{Float64};
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-    lambda::Float64 = 0.0,
+    lambda::Vector{Float64} = zeros(length(xL)),
     epsilon::Float64 = 0.0,
     plot3DStyle::Vector = [surface!, wireframe!, surface], #Set plot style
     fEvalResolution::Int64 = 10, #Set # of function evaluations as points^n
@@ -226,7 +285,8 @@ function plot_sampling_underestimator(
         end #for
 
         #to plot along 3 dimensions:
-        plot3DStyle[3](x1range, x2range, fill(fL, length(x1range), length(x2range)),
+        plot3DStyle[3](x1range, x2range,
+            fill(fL, length(x1range), length(x2range)),
             label = "Lower bound", c=:PRGn_3)
         plot3DStyle[2](x1range, x2range, yMeshAffine,
             label = "Affine underestimator", c=:grays)
@@ -236,16 +296,34 @@ function plot_sampling_underestimator(
         end #if
         plot3DStyle[1](x1range, x2range, yMeshF, colorbar=colorBar,
             title="From top to bottom: (1) Original function,
-            (2) Affine underestimator, and (3) Lower bound",titlefontsize=10,
-            xlabel = "x₁ axis", ylabel = "x₂ axis", zlabel = "y axis", label = "Function", c=:dense)
+            (2) Affine underestimator, and (3) Lower bound",
+            titlefontsize=10, xlabel = "x₁ axis", ylabel = "x₂ axis",
+            zlabel = "y axis", label = "Function", c=:dense)
         wPlus = w0 .+ diagm(wStep)
         wMinus= w0 .- diagm(wStep)
-        scatter!([w0[1]; wPlus[1,:]; wMinus[1,:]], [w0[2]; wPlus[2,:]; wMinus[2,:]], [y0; yPlus; yMinus],
+        scatter!([w0[1]; wPlus[1,:]; wMinus[1,:]],
+            [w0[2]; wPlus[2,:]; wMinus[2,:]],
+            [y0; yPlus; yMinus],
             c=:purple, legend=false)
 
     else
         throw(DomainError("function dimension: must be 1 or 2"))
     end #if
+end #function
+
+# plot using scalar inputs for univariate functions:
+function plot_sampling_underestimator(
+        f::Function,
+        xL::Float64,
+        xU::Float64;
+        alpha::Float64 = DEFAULT_ALPHA,
+        lambda::Float64 = 0.0,
+        epsilon::Float64 = 0.0,
+        plot3DStyle::Vector = [surface!, wireframe!, surface],
+        fEvalResolution::Int64 = 10,
+    )
+    plot_sampling_underestimator(f, [xL], [xU]; alpha = [alpha], lambda = [lambda], epsilon,
+        plot3DStyle, fEvalResolution)
 end #function
 
 end #module

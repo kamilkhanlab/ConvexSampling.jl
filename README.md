@@ -9,7 +9,7 @@ This implementation depends on external package Plots.jl. Tested in Julia v.1.7.
 
 ## Exported functions
 
-The following functions are exported by `SamplingUnderestimators`. In each case, `f` may be provided as an anonymous function or defined beforehand. `f` must accept Vector{Float64} inputs and produce scalar Float64 outputs.
+The following functions are exported by `SamplingUnderestimators`. In each case, `f` may be provided as an anonymous function or defined beforehand. `f` must accept Vector{Float64} inputs and produce scalar Float64 outputs. If `f` is univariate, inputs for exported functions may be scalar Float{64} instead of Vector{Float64} as indicated below.
 
 - `(w0, b, c) = eval_sampling_underestimator_coeffs(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
   - evaluates the `w0`, `b`, and `c` coefficients as Vector{Float64}, Matrix{Float64}, and scalar Float64 respectively where  `b` is the standard centered finite difference approximation of gradient `∇(f(w0))`, `c` resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables, and `w0` is the midpoint of the given box domain.
@@ -34,8 +34,8 @@ The following functions are exported by `SamplingUnderestimators`. In each case,
 ### Key Arguments
 
 All exported functions include the listed optional key word arguments:
-- `alpha::Vector{Float64}`: The step length between successive sample points. A default value is set to an array of constants `DEFAULT_ALPHA = 0.1`. Note that as the step length approaches 0, the affine relaxations and lower bound `fL` become tighter. However, decreasing it too much may introduce significant numerical error.
-- `lambda::Float64`: An offset for the location of `w0`, which accounts for sampled sets where `w0` is not the midpoint of said set. A default value is set to a constant `0.0`.
+- `alpha::Vector{Float64}`: The step length between successive sample points. A default value is set to an array of constants `DEFAULT_ALPHA = 0.1`. All components of alpha must be between (0.0, 1.0 - `lambda`). Note that as the step length approaches 0, the affine relaxations and lower bound `fL` become tighter. However, decreasing it too much may introduce significant numerical error.
+- `lambda::Vector{Float64}`: An offset for the location of `w0`, which accounts for sampled sets where `w0` is not the midpoint of said set. A default value is set to a constant `0.0`. All components of `lambda` must be between (-1.0, 1.0).
 - `epsilon::Float64`: Error tolerance to account for possible error in function evaluations. A default value is set to a constant `0.0`.
 
 ## Example
@@ -75,4 +75,4 @@ graph = plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vecto
 # References
 
 - Yingkai Song, Huiyi Cao, Chiral Mehta, and Kamil A. Khan, [Bounding convex relaxations of process models from below by tractable black-box sampling]( https://doi.org/10.1016/j.compchemeng.2021.107413), _Computers & Chemical Engineering_, 153:107413, 2021, DOI: 10.1016/j.compchemeng.2021.107413
--Larson, Jeffrey, Sven Leyffer, Prashant Palkar, and Stefan M. Wild, [A method for convex black-box integer global optimization]( https://link.springer.com/article/10.1007/s10898-020-00978-w), _Journal of Global Optimization_, 80(2):439-77, 2021, DOI: 10.1007/s10898-020-00978-w
+- Larson, Jeffrey, Sven Leyffer, Prashant Palkar, and Stefan M. Wild, [A method for convex black-box integer global optimization]( https://link.springer.com/article/10.1007/s10898-020-00978-w), _Journal of Global Optimization_, 80(2):439-77, 2021, DOI: 10.1007/s10898-020-00978-w
