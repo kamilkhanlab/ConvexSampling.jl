@@ -9,33 +9,33 @@ This implementation depends on external package Plots.jl. Tested in Julia v.1.7.
 
 ## Exported functions
 
-The following functions are exported by `SamplingUnderestimators`. In each case, `f` may be provided as an anonymous function or defined beforehand. `f` must accept Vector{Float64} inputs and produce scalar Float64 outputs. If `f` is univariate, inputs for exported functions may be scalar Float{64} instead of Vector{Float64} as indicated below.
+The following functions are exported by `SamplingUnderestimators`. In each case, `f` may be provided as an anonymous function or defined beforehand. `f` must accept `Vector{Float64}` inputs and produce scalar `Float64` outputs. If `f` is univariate, inputs for exported functions may be scalar `Float{64}` instead of `Vector{Float64}` as indicated below.
 
 - `(w0, b, c) = eval_sampling_underestimator_coeffs(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
-  - evaluates the `w0`, `b`, and `c` coefficients as Vector{Float64}, Matrix{Float64}, and scalar Float64 respectively where  `b` is the standard centered finite difference approximation of gradient `∇(f(w0))`, `c` resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables, and `w0` is the midpoint of the given box domain.
+  - evaluates the `w0`, `b`, and `c` coefficients as `Vector{Float64}`, `Matrix{Float64}`, and scalar `Float64` respectively where  `b` is the standard centered finite difference approximation of gradient `∇(f(w0))`, `c` resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables, and `w0` is the midpoint of the given box domain.
   - evaluates a special condition for coefficient calculation for univariate functions, relying on the collinear sampling of points, based on the proof from Larson et al (2021).
 
 - `fUnderestimator = construct_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`
   - returns an anonymous function with structure `x -> c + dot(b, x - w0)` representing the affine under-estimator based on the calculated `w0`, `b`, `c` coefficients.
 
 - `yOutput = eval_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}, xIn::Vector{Float64})`
-  - computes the y value as a Float64 of the affine under-estimator given a Float64 x input (`xIn`) based on the calculated `w0`, `b`, `c` coefficients.
+  - computes the y value as a `Float64` of the affine under-estimator given a `Float64` x input (`xIn`) based on the calculated `w0`, `b`, `c` coefficients.
 
--  `fL = eval_sampling_lower_bound(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`
-  - computes a Float64 scalar guaranteed constant lower bound of f on X.
-  - evaluates a special condition for coefficient calculation for univariate functions, relying on the collinear sampling of points, based on the proof from Larson et al (2021).
+-  `fL = eval_sampling_lower_bound(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
+    -   computes a `Float64` scalar guaranteed constant lower bound of f on X.
+    -   evaluates a special condition for coefficient calculation for univariate functions, relying on the collinear sampling of points, based on the proof from Larson et al (2021).
 
 -  `plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}; plot3DStyle::Vector = [surface!, wireframe!, surface], fEvalResolution::Int64 = 10)`
-  - generates a plot of the convex function, affine under-estimator, and lower bound planes/lines within the given box domain.
-  - key argument plot3DStyle sets the plot style (ex. wireframe, surface, etc.) of each individual plot component in the set order: (1) lower bound, (2) affine under-estimator, (3) convex function.
-  - key argument fEvalResolution sets the plot accuracy through the number of function evaluations calculated by the function.
-  - enter `@show <graphname>` in the command window to access stored graphs.
+    -  generates a plot of the convex function, affine under-estimator, and lower bound planes/lines within the given box domain.
+    - key argument `plot3DStyle` sets the plot style (ex. wireframe, surface, etc.) of each individual plot component in the set order: (1) lower bound, (2) affine under-estimator, (3) convex function.
+    - key argument `fEvalResolution` sets the plot accuracy through the number of function evaluations calculated by the function.
+    - enter `@show <graphname>` in the command window to access stored graphs.
 
 ### Key Arguments
 
 All exported functions include the listed optional key word arguments:
-- `alpha::Vector{Float64}`: The step length between successive sample points. A default value is set to an array of constants `DEFAULT_ALPHA = 0.1`. All components of alpha must be between (0.0, 1.0 - `lambda`). Note that as the step length approaches 0, the affine relaxations and lower bound `fL` become tighter. However, decreasing it too much may introduce significant numerical error.
-- `lambda::Vector{Float64}`: An offset for the location of `w0`, which accounts for sampled sets where `w0` is not the midpoint of said set. A default value is set to a constant `0.0`. All components of `lambda` must be between (-1.0, 1.0).
+- `alpha::Vector{Float64}`: The step length between successive sample points. A default value is set to an array of constants `DEFAULT_ALPHA = 0.1`. All components of alpha must be between `(0.0, 1.0 - lambda]`. Note that as the step length approaches `0.0`, the affine relaxations and lower bound `fL` become tighter. However, decreasing it too much may introduce significant numerical error.
+- `lambda::Vector{Float64}`: An offset for the location of `w0`, which accounts for sampled sets where `w0` is not the midpoint of said set. A default value is set to a constant `0.0`. All components of `lambda` must be between `(-1.0, 1.0)`.
 - `epsilon::Float64`: Error tolerance to account for possible error in function evaluations. A default value is set to a constant `0.0`.
 
 ## Example
