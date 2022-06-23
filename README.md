@@ -2,18 +2,19 @@
 
 The `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides an implementation in Julia to:
 
-- compute affine under-estimators for convex functions using (2n+1) black box function evaluations
+- compute affine under-estimators for convex functions using (2n+1) or (n+2) black box function evaluations
 - generate a graphical representation of the convex function and under-estimator
 
 This implementation depends on external package Plots.jl. Tested in Julia v.1.7.
 
 ## Exported functions
 
-The following functions are exported by `SamplingUnderestimators`. In each case, `f` may be provided as an anonymous function or defined beforehand. `f` must accept `Vector{Float64}` inputs and produce scalar `Float64` outputs. If `f` is univariate, inputs for exported functions may be scalar `Float{64}` instead of `Vector{Float64}` as indicated below.
+The following functions are exported by `SamplingUnderestimators`. In each case, `f` may be provided as an anonymous function or defined beforehand. `f` must accept `Vector{Float64}` inputs and produce scalar `Float64` outputs. If `f` is univariate, inputs for exported functions may be scalar `Float{64}` instead of `Vector{Float64}` as indicated below. By default, the module uses the (2n+1) function evaluation method.
 
 - `(w0, b, c) = eval_sampling_underestimator_coeffs(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
   - evaluates the `w0`, `b`, and `c` coefficients as `Vector{Float64}`, `Matrix{Float64}`, and scalar `Float64` respectively where  `b` is the standard centered finite difference approximation of gradient `∇(f(w0))`, `c` resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables, and `w0` is the midpoint of the given box domain.
   - evaluates a special condition for coefficient calculation for univariate functions, relying on the collinear sampling of points, based on the proof from Larson et al (2021).
+  - evaluates additional variable `sR` as Vector{Float64} when considering (n+2) sampled points.
 
 - `fUnderestimator = construct_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`
   - returns an anonymous function with structure `x -> c + dot(b, x - w0)` representing the affine under-estimator based on the calculated `w0`, `b`, `c` coefficients.
@@ -34,6 +35,7 @@ The following functions are exported by `SamplingUnderestimators`. In each case,
 ### Key Arguments
 
 All exported functions include the listed optional key word arguments:
+- `SamplingPolicy::SamplingPolicyType`: An enum datatype that determines the number of sample points calculated. The default is set to `Sample_Compass_Star`, which uses (2n+1) function evaluations. `Sample_Simplex_Star` may be entered to access the (n+2) evaluation method. Note the (n+2) method does not utilize `lambda` or `epsilon`.
 - `alpha::Vector{Float64}`: The step length between successive sample points. A default value is set to an array of constants `DEFAULT_ALPHA = 0.1`. All components of alpha must be between `(0.0, 1.0 - lambda]`. Note that as the step length approaches `0.0`, the affine relaxations and lower bound `fL` become tighter. However, decreasing it too much may introduce significant numerical error.
 - `lambda::Vector{Float64}`: An offset for the location of `w0`, which accounts for sampled sets where `w0` is not the midpoint of said set. A default value is set to a constant `0.0`. All components of `lambda` must be between `(-1.0, 1.0)`.
 - `epsilon::Float64`: Error tolerance to account for possible error in function evaluations. A default value is set to a constant `0.0`.

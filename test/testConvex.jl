@@ -5,6 +5,9 @@ Uses .ConvexSample to evaluate a affine underestimator function, replicating
 the results of calculations from the following article:
 
 [1]: KA Khan et al (2021), https://doi.org/10.1016/j.compchemeng.2021.107413
+
+An alternate method under construction has also been implemented to evaluate
+the function with fewer sample points.
 =#
 
 include("../src/SamplingUnderestimators.jl")
