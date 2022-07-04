@@ -15,14 +15,14 @@ has also been implemented, which uses n+2 evaluations.
 
 ...
 
-Written by Maha Chaudhry on June 13, 2022
+Written by Maha Chaudhry on July 4, 2022
 =#
 module SamplingUnderestimators
 
 using LinearAlgebra
 using Plots
 
-export SamplingPolicyType, Sample_Compass_Star, Sample_Simplex_Star,
+export SamplingType, SAMPLE_COMPASS_STAR, SAMPLE_SIMPLEX_STAR,
     eval_sampling_underestimator_coeffs,
     construct_sampling_underestimator,
     eval_sampling_underestimator,
@@ -33,11 +33,11 @@ export SamplingPolicyType, Sample_Compass_Star, Sample_Simplex_Star,
 ## defined on a box domain with a Vector input
 
 # define sampling method type
-#   Sample_Compass_Star = sample 2n+1 points
+#   SAMPLE_COMPASS_STAR = sample 2n+1 points
 #   Sample_Simplex Star = sample n+2 points
-@enum SamplingPolicyType begin
-    Sample_Compass_Star = 1
-    Sample_Simplex_Star = 2
+@enum SamplingType begin
+    SAMPLE_COMPASS_STAR
+    SAMPLE_SIMPLEX_STAR
 end
 
 # default step size (alpha)
@@ -52,7 +52,7 @@ function sample_convex_function(
         f::Function, #functions must accept Vector{Float64} inputs and output scalar Float64
         xL::Vector{Float64},
         xU::Vector{Float64};
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star, #set default sampling method to 2n+1
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR, #set default sampling method to 2n+1
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), #sets default value for α
         lambda::Vector{Float64} = zeros(length(xL)), #accomodates offset of sampled midpoint
         epsilon::Float64 = 0.0 #accounts for error in function evaluations
@@ -61,44 +61,49 @@ function sample_convex_function(
 
     #domain error checks
     if length(xU) != n
-        throw(DomainError("function dimension: length of xL and xU must be equal"))
-    elseif any(alpha .> (1.0 .- lambda)) || any(alpha .<= 0.0)
-        throw(DomainError("function dimension: alpha out of range of (0.0, 1.0-lambda)"))
-    elseif (n > 1) && (SamplingPolicy == Sample_Simplex_Star) &&
-        (lambda != zeros(length(xL)) || epsilon != 0.0)
-        throw(DomainError("function dimension: this method does not use lambda or epsilon"))
-    elseif any(lambda .<= -1.0) || any(lambda .>= 1.0)
-        throw(DomainError("function dimension: lambda out of range of (-1.0, 1.0)"))
+        throw(DomainError("xL or xU dimension: length of xL and xU must be equal"))
+    end #if
+    if !all(0.0 .< alpha .<= (1.0 .- lambda))
+        throw(DomainError("alpha dimension: each component must be between 0.0 and (1.0-lambda)"))
+    end #if
+    if !all(-1.0 .< lambda .< 1.0)
+        throw(DomainError("lambda dimension: each component must be between -1.0 and 1.0"))
     end #if
 
+    #calculate midpoint
     w0 = @. 0.5*(1 + lambda)*(xL + xU)
     y0 = f(w0)
-    if typeof(y0) != Float64
+    if !(y0 isa Float64)
         throw(DomainError("function dimension: function output must be scalar Float64"))
-    end
+    end #if
 
+    #calculate sample points
     wStep = @. 0.5*alpha*(xU - xL)
-    yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ diagm(wStep))]
-    if SamplingPolicy == Sample_Compass_Star
-        yMinus = [f(wMinus) for wMinus in eachcol(w0 .- diagm(wStep))]
-    elseif SamplingPolicy == Sample_Simplex_Star
+    wStepDiag = diagm(wStep)
+    yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ wStepDiag)]
+    if SamplingPolicy == SAMPLE_COMPASS_STAR
+        yMinus = [f(wMinus) for wMinus in eachcol(w0 .- wStepDiag)]
+    elseif SamplingPolicy == SAMPLE_SIMPLEX_STAR
         yMinus = [f(w0 - wStep)]
+    else
+        throw(DomainError("SamplingPolicy dimension: sampling method type does not exist"))
     end #if
     return w0, y0, wStep, yPlus, yMinus
 end #function
 
 # compute sampled values using scalar inputs for univariate functions
 function sample_convex_function(
-        f::Function, #functions must accept Vector{Float64} inputs and output scalar Float64
+        f::Function, #functions may accept Float64 or Vector64 inputs and must output scalar Float64
         xL::Float64,
         xU::Float64;
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Float64 = DEFAULT_ALPHA,
-        lambda::Float64= 0.0,
+        lambda::Float64 = 0.0,
         epsilon::Float64 = 0.0
     )
-    sample_convex_function(f, [xL], [xU]; SamplingPolicy,
-        alpha = [alpha], lambda = [lambda], epsilon)
+    fMultiVar(x) = f(x[1])
+    sample_convex_function(fMultiVar, [xL], [xU];
+        SamplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # compute coefficients for affine underestimator function where:
@@ -111,17 +116,18 @@ function eval_sampling_underestimator_coeffs(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
         lambda::Vector{Float64} = zeros(length(xL)),
         epsilon::Float64 = 0.0
     )
     n = length(xL)
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; SamplingPolicy, alpha, lambda, epsilon)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
 
-    if n == 1 || SamplingPolicy == Sample_Compass_Star
-        b = zeros(n,1)
-        for (i, bi) in enumerate(b)
+    if n == 1 || SamplingPolicy == SAMPLE_COMPASS_STAR
+        b = zeros(n)
+        for (i, eachindex) in enumerate(b)
             if (xL[i] < xU[i]) || (xL[i] == xU[i])
                 b[i] = (yPlus[i] - yMinus[i])/abs.(2.0.*wStep[i])
             end #if
@@ -142,24 +148,24 @@ function eval_sampling_underestimator_coeffs(
         return w0, b, c, []
 
     #alternate calculation for b and c vectors assuming n+2 sampled points:
-    elseif SamplingPolicy == Sample_Simplex_Star
+    elseif SamplingPolicy == SAMPLE_SIMPLEX_STAR
         sU = @. 2.0*(yPlus - y0)/abs(2.0*wStep)
-        sL = zeros(n,1)
-        for (i, sLi) in enumerate(sL)
-            yjsum = 0.0
+        sL = zeros(n)
+        for (i, eachindex) in enumerate(sL)
+            yjSum = 0.0
             for (j, yPlusj) in enumerate(yPlus)
                 if j != i
-                    yjsum += y0 - yPlus[j]
+                    yjSum += y0 - yPlusj
                 end
             end
-            sL[i] = @. 2.0*(y0 - yMinus[1] + yjsum)/abs(2.0*wStep[i])
+            sL[i] = @. 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStep[i])
         end
         b = 0.5.*(sL + sU)
 
         #coefficient c calculated as affineFunc(w0):
         sR = 0.5.*(sU - sL)
         c = y0 - 0.5.*dot(sR, xU - xL)
-        return w0, b, c[1], sR
+        return w0, b, c, sR
     end #if
 end #function
 
@@ -168,13 +174,14 @@ function eval_sampling_underestimator_coeffs(
         f::Function,
         xL::Float64,
         xU::Float64;
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Float64 = DEFAULT_ALPHA,
-        lambda::Float64= 0.0,
+        lambda::Float64 = 0.0,
         epsilon::Float64 = 0.0
     )
-    eval_sampling_underestimator_coeffs(f, [xL], [xU]; SamplingPolicy,
-        alpha = [alpha], lambda = [lambda], epsilon)
+    fMultiVar(x) = f(x[1])
+    eval_sampling_underestimator_coeffs(fMultiVar, [xL], [xU];
+        SamplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # define affine underestimator function using calculated b, c coefficients:
@@ -182,14 +189,13 @@ function construct_sampling_underestimator(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
         lambda::Vector{Float64} = zeros(length(xL)),
         epsilon::Float64 = 0.0
     )
-    n = length(xL)
-    w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU; SamplingPolicy,
-        alpha, lambda, epsilon)
+    w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
     return x -> c + dot(b, x - w0)
 end #function
 
@@ -198,13 +204,14 @@ function construct_sampling_underestimator(
         f::Function,
         xL::Float64,
         xU::Float64;
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Float64 = DEFAULT_ALPHA,
-        lambda::Float64= 0.0,
+        lambda::Float64 = 0.0,
         epsilon::Float64 = 0.0
     )
-    construct_sampling_underestimator(f, [xL], [xU]; SamplingPolicy,
-        alpha = [alpha], lambda = [lambda], epsilon)
+    fMultiVar(x) = f(x[1])
+    construct_sampling_underestimator(fMultiVar, [xL], [xU];
+        SamplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # compute affine underestimator y-value using:
@@ -215,13 +222,13 @@ function eval_sampling_underestimator(
     xL::Vector{Float64},
     xU::Vector{Float64},
     xIn::Vector{Float64}; #define x-input value
-    SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+    SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
     lambda::Vector{Float64} = zeros(length(xL)),
     epsilon::Float64 = 0.0
 )
-    affinefunc = construct_sampling_underestimator(f, xL, xU; SamplingPolicy,
-        alpha, lambda, epsilon)
+    affinefunc = construct_sampling_underestimator(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
     return affinefunc(xIn)
 end #function
 
@@ -231,13 +238,14 @@ function eval_sampling_underestimator(
         xL::Float64,
         xU::Float64,
         xIn::Float64;
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Float64 = DEFAULT_ALPHA,
-        lambda::Float64= 0.0,
+        lambda::Float64 = 0.0,
         epsilon::Float64 = 0.0
     )
-    eval_sampling_underestimator(f, [xL], [xU], [xIn]; SamplingPolicy,
-        alpha = [alpha], lambda = [lambda], epsilon)
+    fMultiVar(x) = f(x[1])
+    eval_sampling_underestimator(fMultiVar, [xL], [xU], [xIn];
+        SamplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # compute:
@@ -246,30 +254,31 @@ function eval_sampling_lower_bound(
         f::Function,
         xL::Vector{Float64},
         xU::Vector{Float64};
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
         lambda::Vector{Float64} = zeros(length(xL)),
         epsilon::Float64 = 0.0
     )
     n = length(xL)
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; SamplingPolicy,
-        alpha, lambda, epsilon)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
 
     #coefficient c can be tightened in special cases where f is univariate:
-    if (n > 1 || lambda != zeros(n) || epsilon != 0.0) && (SamplingPolicy == Sample_Compass_Star)
+    if n == 1 && epsilon == 0.0 && lambda == zeros(n)
+        fL = (@. min(2.0*y0-yPlus,
+            2.0*y0-yMinus,
+            (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
+            (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
+    elseif SamplingPolicy == SAMPLE_SIMPLEX_STAR
+        w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU;
+            SamplingPolicy, alpha, lambda, epsilon)
+        fL = y0 .- 0.5.*sum(abs.(b).*abs.(xL - xU)) .- 0.5*dot(sR, xU - xL)
+    elseif SamplingPolicy == SAMPLE_COMPASS_STAR
         fL = y0 - epsilon
         for i in range(1,n)
             fL -= ((1.0 + abs(lambda[i]))*(max(yPlus[i], yMinus[i])
                 - y0 + 2.0*epsilon))/alpha[i]
         end #for
-    elseif (n > 1) && (SamplingPolicy == Sample_Simplex_Star)
-        w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU; SamplingPolicy,
-            alpha, lambda, epsilon)
-        fL = y0 .- 0.5.*sum(abs.(b).*abs.(xL - xU)) .- 0.5*dot(sR, xU - xL)
-    elseif n == 1
-        fL = (@. min(2.0*y0-yPlus, 2.0*y0-yMinus,
-            (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
-            (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
     end #if
     return fL
 end #function
@@ -279,13 +288,14 @@ function eval_sampling_lower_bound(
         f::Function,
         xL::Float64,
         xU::Float64;
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Float64 = DEFAULT_ALPHA,
-        lambda::Float64= 0.0,
+        lambda::Float64 = 0.0,
         epsilon::Float64 = 0.0
     )
-    eval_sampling_lower_bound(f, [xL], [xU]; SamplingPolicy,
-        alpha = [alpha], lambda = [lambda], epsilon)
+    fMultiVar(x) = f(x[1])
+    eval_sampling_lower_bound(fMultiVar, [xL], [xU];
+        SamplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # plot:
@@ -297,7 +307,7 @@ function plot_sampling_underestimator(
     f::Function,
     xL::Vector{Float64},
     xU::Vector{Float64};
-    SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+    SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
     lambda::Vector{Float64} = zeros(length(xL)),
     epsilon::Float64 = 0.0,
@@ -310,10 +320,13 @@ function plot_sampling_underestimator(
 
     n = length(xL)
     #set function definition to speed up computational time:
-    affineFunc = construct_sampling_underestimator(f, xL, xU; SamplingPolicy, alpha, lambda, epsilon)
+    affineFunc = construct_sampling_underestimator(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
     #calculate scalar values:
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU; SamplingPolicy, alpha, lambda, epsilon)
-    fL = eval_sampling_lower_bound(f, xL, xU; SamplingPolicy, alpha, lambda, epsilon)
+    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
+    fL = eval_sampling_lower_bound(f, xL, xU;
+        SamplingPolicy, alpha, lambda, epsilon)
 
     if n == 1
         #sampled points on univariate functions are collinear, so range of points
@@ -331,6 +344,7 @@ function plot_sampling_underestimator(
         plot!(xMesh, yMeshAffine, label = "Affine underestimator")
         plot!(xMesh, fill!(yMeshF,fL), label = "Lower bound")
         scatter!([w0; w0 + wStep; w0 - wStep], [y0; yPlus; yMinus], label = "Sampled points")
+
     elseif n == 2
         #for higher dimension functions, a meshgrid of points is required
         #as function and affine accuracy may differ, each require individual meshgrids
@@ -361,9 +375,9 @@ function plot_sampling_underestimator(
             titlefontsize=10, xlabel = "x₁ axis", ylabel = "x₂ axis",
             zlabel = "y axis", label = "Function", c=:dense)
         wPlus = w0 .+ diagm(wStep)
-        if SamplingPolicy == Sample_Compass_Star
+        if SamplingPolicy == SAMPLE_COMPASS_STAR
             wMinus= w0 .- diagm(wStep)
-        elseif SamplingPolicy == Sample_Simplex_Star
+        elseif SamplingPolicy == SAMPLE_SIMPLEX_STAR
             wMinus = w0 - wStep
         end #if
         scatter!([w0[1]; wPlus[1,:]; wMinus[1,:]],
@@ -380,15 +394,16 @@ function plot_sampling_underestimator(
         f::Function,
         xL::Float64,
         xU::Float64;
-        SamplingPolicy::SamplingPolicyType = Sample_Compass_Star,
+        SamplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
         alpha::Float64 = DEFAULT_ALPHA,
         lambda::Float64 = 0.0,
         epsilon::Float64 = 0.0,
         plot3DStyle::Vector = [surface!, wireframe!, surface],
         fEvalResolution::Int64 = 10,
     )
-    plot_sampling_underestimator(f, [xL], [xU]; SamplingPolicy,
-        alpha = [alpha], lambda = [lambda], epsilon,
+    fMultiVar(x) = f(x[1])
+    plot_sampling_underestimator(fMultiVar, [xL], [xU];
+        SamplingPolicy, alpha = [alpha], lambda = [lambda], epsilon,
         plot3DStyle, fEvalResolution)
 end #function
 
