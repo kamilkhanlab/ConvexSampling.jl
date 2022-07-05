@@ -42,7 +42,7 @@ end
 
 # default dimensionless stepsize.
 #   Smaller is generally better, but pushing alpha too small
-#   will leave us vulnerable to numerical error in subtraction 
+#   will leave us vulnerable to numerical error in subtraction
 const DEFAULT_ALPHA = 0.1
 
 # sample convex function, to later generate affine underestimators.
@@ -51,7 +51,7 @@ function sample_convex_function(
     f::Function, # must be convex and of the form f(x::Vector{Float64})::Float64
     xL::Vector{Float64},
     xU::Vector{Float64};
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR, 
+    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
     lambda::Vector{Float64} = zeros(length(xL)), # dimesionless offset of sampling stencil
     epsilon::Float64 = 0.0 # absolute error in evaluating f
@@ -67,6 +67,9 @@ function sample_convex_function(
     end #if
     if !all(-1.0 .< lambda .< 1.0)
         throw(DomainError("lambda: each component must be between -1.0 and 1.0"))
+    end #if
+    if !(xU > xL)
+        throw(DomainError("xL and xU: each component of xU must be greater than or equal to its respective component in xL"))
     end #if
 
     # sample midpoint of stencil
@@ -125,10 +128,8 @@ function eval_sampling_underestimator_coeffs(
 
     if n == 1 || samplingPolicy == SAMPLE_COMPASS_STAR
         b = zeros(n)
-        for (i, eachindex) in enumerate(b)
-            if (xL[i] < xU[i]) || (xL[i] == xU[i])
-                b[i] = (yPlus[i] - yMinus[i])/abs.(2.0.*wStep[i])
-            end #if
+        for (i, yPlusI, yMinusI, wStepI) in zip(1:n, yPlus, yMinus, wStep)
+            b[i] = (yPlusI - yMinusI)/abs.(2.0.*wStepI)
         end #for
 
         #coefficient c can be tightened in special cases where f is univariate
@@ -136,9 +137,9 @@ function eval_sampling_underestimator_coeffs(
         c = y0[1]
         if n > 1
             c -= epsilon
-            for i in range(1,n)
-                c -= ((1.0 + abs(lambda[i]))*(yPlus[i] + yMinus[i]
-                                              - 2.0*y0 + 4.0*epsilon))/(2.0*alpha[i])
+            for (lambdaI, yPlusI, yMinusI, alphaI) in zip(lambda, yPlus, yMinus, alpha)
+                c -= ((1.0 + abs(lambdaI))*(yPlusI + yMinusI
+                                              - 2.0*y0 + 4.0*epsilon))/(2.0*alphaI)
             end #for
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
@@ -149,14 +150,14 @@ function eval_sampling_underestimator_coeffs(
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         sU = @. 2.0*(yPlus - y0)/abs(2.0*wStep)
         sL = zeros(n)
-        for (i, eachindex) in enumerate(sL)
+        for (i, wStepI) in zip(1:n, wStep)
             yjSum = 0.0
             for (j, yPlusj) in enumerate(yPlus)
                 if j != i
                     yjSum += y0 - yPlusj
                 end
             end
-            sL[i] = @. 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStep[i])
+            sL[i] = @. 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStepI)
         end
         b = 0.5.*(sL + sU)
 
@@ -315,7 +316,7 @@ function plot_sampling_underestimator(
     fEvalResolution::Int64 = 10 #Set # of function evaluations as points^n
 )
     if !all(xU .> xL)
-        throw(DomainError("function dimension: individual components of xU must be greater than individual components of xL"))
+        throw(DomainError("xL and xU: each component of xU must be greater than its respective component in xL"))
     end
 
     n = length(xL)
