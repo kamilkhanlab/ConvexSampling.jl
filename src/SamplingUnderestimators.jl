@@ -143,7 +143,7 @@ function eval_sampling_underestimator_coeffs(
             end #for
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
-        end #if=#
+        end #if
         return w0, b, c, []
 
         #alternate calculation for b and c vectors assuming n+2 sampled points:
@@ -152,13 +152,13 @@ function eval_sampling_underestimator_coeffs(
         sL = zeros(n)
         for (i, wStepI) in zip(1:n, wStep)
             yjSum = 0.0
-            for (j, yPlusj) in enumerate(yPlus)
+            for (j, yPlusJ) in enumerate(yPlus)
                 if j != i
-                    yjSum += y0 - yPlusj
-                end
-            end
+                    yjSum += y0 - yPlusJ
+                end #for
+            end #for
             sL[i] = @. 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStepI)
-        end
+        end #for
         b = 0.5.*(sL + sU)
 
         #coefficient c calculated as affineFunc(w0):
@@ -335,9 +335,9 @@ function plot_sampling_underestimator(
         xMesh = range(xL[1], xU[1], fEvalResolution)
         yMeshF = zeros(fEvalResolution,1) #to collect function evaluations
         yMeshAffine = zeros(fEvalResolution,1) #to collect affine underestimator evaluations
-        for (i, xi) in enumerate(xMesh)
-            yMeshF[i] = f(xi)
-            yMeshAffine[i] = affineFunc([xi])
+        for (i, xI) in enumerate(xMesh)
+            yMeshF[i] = f(xI)
+            yMeshAffine[i] = affineFunc([xI])
         end #for
 
         #to plot along 2 dimensions:
