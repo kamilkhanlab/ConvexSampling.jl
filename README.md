@@ -1,17 +1,17 @@
 # convex-sampling
 
 In [our recent paper](https://doi.org/10.1016/j.compchemeng.2021.107413), we presented a new approach for generating a guaranteed affine underestimator for a black-box convex function on a box domain, by tractable derivative-free sampling.
-The `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides an implementation in Julia of this approach, along with an experimental new approach that uses fewer samples.
+In this repository, the `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides a Julia implementation  of our new sampling approach, along with an experimental approach that uses fewer samples.
 
-This implementation depends on the external package Plots.jl. Tested in Julia v.1.7.
+This implementation uses `Plots.jl` to generate plots. Tested in Julia v.1.7. Primarily written by Maha Chaudhry.
 
 ## Method outline
 
-Suppose we have a convex function `f` of `n` variables, defined on a box domain `X = [xL, xU]`. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples `f` at `(2n+1)` domain points: the midpoint of `X`, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for `f` on `X`. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of `f` at the midpoint of `X`. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
+Suppose we have a convex function `f` of `n` variables, defined on a box domain `X = [xL, xU]`. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples `f` at `2n+1` domain points: the midpoint of `X`, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for `f` on `X`. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of `f` at the midpoint of `X`. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
 
 As in our paper, this implementation also allows for absolute error in evaluating `f`, and for off-center sampling stencils. When `n=1`, we additionally exploit the fact that each domain point is collinear with all three sampled points.
 
-An experimental new procedure is also implemented, requiring `(n+2)` samples instead of `(2n+1)` samples.
+An experimental new procedure is also implemented, requiring `n+2` samples instead of `2n+1` samples.
 
 ## Exported functions
 
@@ -25,17 +25,17 @@ The following functions are exported by `SamplingUnderestimators`:
 
 - `(w0::T, b::T, c::Float64, sR::T) = eval_sampling_underestimator_coeffs(f, xL, xU)`:
   - evaluates coefficients for which the affine function `x -> c + dot(b, x - w0)` is guaranteed to underestimate `f` on `[xL, xU]`. 
-  - The function `f` is sampled `(2n+1)` times by default.
+  - The function `f` is sampled `2n+1` times by default.
   - The additional output `sR` is only used by our experimental method that samples `f` fewer times.
 
 - `fAffine::Function = construct_sampling_underestimator(f, xL, xU)`
   - same as `eval_sampling_underestimator_coeffs`, except that the underestimator function `fAffine(x) = c + dot(b, x - w0)` is returned.
 
 - `yOut::Float64 = eval_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}, xIn::Vector{Float64})`
-  - generates the affine underestimator and evaluates it at `xIn`. With `fAffine` constructed by `construct_sampling_underestimator`, we have `yOut = fAffine(xIn)`.
+  - evaluates the underestimator `fAffine` constructed by `construct_sampling_underestimator` at a domain point `xIn`. That is, `yOut = fAffine(xIn)`.
 
 -  `fL::Float64 = eval_sampling_lower_bound(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
-    - computes a lower bound `fL` of `f` on the box `[xL, xU]`, so that `f(x)>=fL` for each `x` in the box.
+    - computes a lower bound `fL` of `f` on the box `[xL, xU]`, so that `f(x) >= fL` for each `x` in the box.
 
 -  `plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}; plot3DStyle::Vector = [surface!, wireframe!, surface], fEvalResolution::Int64 = 10)`
     -  plots `f`, its affine underestimator `fAffine`, and its lower bound `fL`, on the box domain `[xL, xU]`. `f` must be a function of either `1` or `2` variables, and must take a `Vector{Float64}` input.
@@ -43,7 +43,7 @@ The following functions are exported by `SamplingUnderestimators`:
     - The key argument `fEvalResolution` is the number of mesh rows per domain dimension in the resulting plot.
     - The produced graph may be stored to a variable and later retrieved with `@show`; see example below.
 
-### Key Arguments
+### Key arguments
 
 All exported functions also include the following optional keyword arguments, with indicated default values:
 - `SamplingPolicy::SamplingType`:
