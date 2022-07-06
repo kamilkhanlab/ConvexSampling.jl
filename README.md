@@ -34,10 +34,10 @@ The following functions are exported by `SamplingUnderestimators`:
 - `fAffine::Function = construct_sampling_underestimator(f, xL, xU)`
   - same as `eval_sampling_underestimator_coeffs`, except that the underestimator function `fAffine(x) = c + dot(b, x - w0)` is returned.
 
-- `yOut::Float64 = eval_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}, xIn::Vector{Float64})`
+- `yOut::Float64 = eval_sampling_underestimator(f, xL, xU, xIn::T)`
   - evaluates the underestimator `fAffine` constructed by `construct_sampling_underestimator` at a domain point `xIn`. That is, `yOut = fAffine(xIn)`.
 
--  `fL::Float64 = eval_sampling_lower_bound(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
+-  `fL::Float64 = eval_sampling_lower_bound(f, xL, xU)`:
     - computes a lower bound `fL` of `f` on the box `[xL, xU]`, so that `f(x) >= fL` for each `x` in the box.
 
 -  `plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}; plot3DStyle::Vector = [surface!, wireframe!, surface], fEvalResolution::Int64 = 10)`
