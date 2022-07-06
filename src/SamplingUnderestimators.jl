@@ -62,14 +62,14 @@ function sample_convex_function(
     if length(xU) != n
         throw(DomainError("xL and xU: length of xL and xU must be equal"))
     end #if
+    if !(xL <= xU)
+        throw(DomainError("xL and xU: must have xL[i]<=xU[i] for each i"))
+    end #if
     if !all(0.0 .< alpha .<= (1.0 .- lambda))
         throw(DomainError("alpha: each component must be between 0.0 and (1.0-lambda)"))
     end #if
     if !all(-1.0 .< lambda .< 1.0)
         throw(DomainError("lambda: each component must be between -1.0 and 1.0"))
-    end #if
-    if !(xU > xL)
-        throw(DomainError("xL and xU: each component of xU must be greater than or equal to its respective component in xL"))
     end #if
 
     # sample midpoint of stencil
@@ -88,7 +88,7 @@ function sample_convex_function(
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         yMinus = [f(w0 - wStep)]
     else
-        throw(DomainError("samplingPolicy: unsupported value"))
+        throw(DomainError("unsupported samplingPolicy"))
     end #if
     return w0, y0, wStep, yPlus, yMinus
 end #function
@@ -128,8 +128,10 @@ function eval_sampling_underestimator_coeffs(
 
     if n == 1 || samplingPolicy == SAMPLE_COMPASS_STAR
         b = zeros(n)
-        for (i, yPlusI, yMinusI, wStepI) in zip(1:n, yPlus, yMinus, wStep)
-            b[i] = (yPlusI - yMinusI)/abs.(2.0.*wStepI)
+        for (i, xLI, xUI, yPlusI, yMinusI, wStepI) in zip(eachindex(b), xL, xU, yPlus, yMinus, wStep)
+            if xLI < xUI
+                b[i] = (yPlusI - yMinusI)/abs(2.0*wStepI)
+            end
         end #for
 
         #coefficient c can be tightened in special cases where f is univariate
@@ -144,13 +146,13 @@ function eval_sampling_underestimator_coeffs(
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
         end #if
-        return w0, b, c, []
+        sR = [] 
 
         #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         sU = @. 2.0*(yPlus - y0)/abs(2.0*wStep)
         sL = zeros(n)
-        for (i, wStepI) in zip(1:n, wStep)
+        for (i, wStepI) in zip(eachindex(sL), wStep)
             yjSum = 0.0
             for (j, yPlusJ) in enumerate(yPlus)
                 if j != i
@@ -164,11 +166,12 @@ function eval_sampling_underestimator_coeffs(
         #coefficient c calculated as affineFunc(w0):
         sR = 0.5.*(sU - sL)
         c = y0 - 0.5.*dot(sR, xU - xL)
-        return w0, b, c, sR
 
     else
-        throw(DomainError("samplingPolicy: unsupported value"))
+        throw(DomainError("unsupported samplingPolicy"))
     end #if
+
+    return w0, b, c, sR
 end #function
 
 # compute coefficients using scalar inputs for univariate functions:
