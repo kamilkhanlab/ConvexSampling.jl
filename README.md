@@ -20,7 +20,7 @@ The module `SamplingUnderestimators` exports several functions, with the followi
 - `f::Function`: the convex function to be sampled and underestimated.
   - Must have either the signature `f(x::Vector{Float64})::Float64` or `f(x::Float64)::Float64`. 
   - Must be convex, otherwise the generated results will be meaningless; our implementation treats `f` as a black box and cannot verify convexity. 
-  - In the remainder of this section, `T` will denote the type of `x` (either `Vector{Float64}` or `Float64`).
+  - In the remainder of this section, `T` will denote the type of `f`'s input (either `Vector{Float64}` or `Float64`).
 
 - `xL::T` and `xU::T`: specify the box domain on which `f` is defined. A vector `x` is considered to be inside this box if `xL<=x<=xU`.
 
