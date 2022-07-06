@@ -1,70 +1,72 @@
 # convex-sampling
 
-The `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides an implementation in Julia to:
-
-- compute affine under-estimators for convex functions using (2n+1) black box function evaluations where n is the number of function variables
-- compute affine underestimators for convex functions using an experimental (n+2) black box function evaluations method
-- generate a graphical representation of the convex function and under-estimator when n = 1 or 2
+In [our recent paper](https://doi.org/10.1016/j.compchemeng.2021.107413), we presented a new approach for generating a guaranteed affine underestimator for a black-box convex function on a box domain, by tractable derivative-free sampling.
+The `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides an implementation in Julia of this approach, along with an experimental new approach that uses fewer samples.
 
 This implementation depends on the external package Plots.jl. Tested in Julia v.1.7.
 
-## Method Decscription
+## Method outline
 
-The [(2n+1) method](https://doi.org/10.1016/j.compchemeng.2021.107413) uses black-box sampling to evaluate the function at (2n+1) points within the defined box domain where n represents the number of function variables.
+Suppose we have a convex function `f` of `n` variables, defined on a box domain `X = [xL, xU]`. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples `f` at `(2n+1)` domain points: the midpoint of `X`, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for `f` on `X`. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of `f` at the midpoint of `X`. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
 
-Vectors `xL` and `xU` define the upper and lower limits of the box domain. Visually, when considering two or three dimensional domains, this can be described as the lower left point and the upper right point of the box respectively. For one dimensional domains, it can be described as the left most and right most points.
+As in our paper, this implementation also allows for absolute error in evaluating `f`, and for off-center sampling stencils. When `n=1`, we additionally exploit the fact that each domain point is collinear with all three sampled points.
 
-Step length, `alpha`, defines the dimensionless length away from the midpoint of the box domain `w0`. It is used to locate the x-values of the the (2n) sampled points. Note that as the step length approaches `0.0`, the affine relaxations and lower bound `fL` become tighter. However, decreasing it too much may introduce significant numerical error due to the loss of precision during subtraction.
-
-The structure of the affine underestimator is defined as: `f(x) = c + dot(b, x - w0)`. The `b` coefficient is the standard centered finite difference approximation of gradient `∇(f(w0))`. The `c` coefficient resembles the standard difference approximation of a second order partial derivative for functions of 2+ variables.
-
-For univariate functions, a special condition is evaluated for coefficient calculation, relying on the collinear sampling of points.
+An experimental new procedure is also implemented, requiring `(n+2)` samples instead of `(2n+1)` samples.
 
 ## Exported functions
 
-The following functions are exported by `SamplingUnderestimators`. In each case, `f::Function` may be provided as an anonymous function or defined beforehand. `f` must be convex and accept `Vector{Float64}` inputs and produce scalar `Float64` outputs. If `f` is univariate, inputs for exported functions may be scalar `Float{64}` instead of `Vector{Float64}` as indicated below.
+The module `SamplingUnderestimators` exports several functions, with the following common inputs:
 
-- `(w0, b, c) = eval_sampling_underestimator_coeffs(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
-  - evaluates the `w0`, `b`, and `c` coefficients as `Vector{Float64}`, `Vector{Float64}`, and scalar `Float64` respectively.
-  - evaluates additional variable `sR` as Vector{Float64} when considering (n+2) sampled points.
+- `f::Function`: the convex function to be sampled and underestimated, with either the signature `f(x::Vector{Float64})::Float64` or `f(x::Float64)::Float64`. The function `f` must be convex, otherwise the generated results will be meaningless; our implementation treats `f` as a black box and cannot verify convexity. In the remainder of this section, `T` will denote the type of `x` (either `Vector{Float64}` or `Float64`).
 
-- `fUnderestimator = construct_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`
-  - returns a function with structure `x -> c + dot(b, x - w0)` representing the affine under-estimator.
+- `xL::T` and `xU::T`: specify the box domain on which `f` is defined. A vector `x` is considered to be inside this box if `xL<=x<=xU`.
 
-- `yOutput = eval_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}, xIn::Vector{Float64})`
-  - evaluates the affine under-estimator at a given `Vector{Float64}` x input value (`xIn`) as a `Float64` output.
+The following functions are exported by `SamplingUnderestimators`:
 
--  `fL = eval_sampling_lower_bound(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
-    -   computes a `Float64` lower bound `fL::Float64` for which f(x) >= fL for each x in the box `[xL, xU]`.
+- `(w0::T, b::T, c::Float64, sR::T) = eval_sampling_underestimator_coeffs(f, xL, xU)`:
+  - evaluates coefficients for which the affine function `x -> c + dot(b, x - w0)` is guaranteed to underestimate `f` on `[xL, xU]`. 
+  - The function `f` is sampled `(2n+1)` times by default.
+  - The additional output `sR` is only used by our experimental method that samples `f` fewer times.
+
+- `fAffine::Function = construct_sampling_underestimator(f, xL, xU)`
+  - same as `eval_sampling_underestimator_coeffs`, except that the underestimator function `fAffine(x) = c + dot(b, x - w0)` is returned.
+
+- `yOut::Float64 = eval_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}, xIn::Vector{Float64})`
+  - generates the affine underestimator and evaluates it at `xIn`. With `fAffine` constructed by `construct_sampling_underestimator`, we have `yOut = fAffine(xIn)`.
+
+-  `fL::Float64 = eval_sampling_lower_bound(f::Function, xL::Vector{Float64}, xU::Vector{Float64})`:
+    - computes a lower bound `fL` of `f` on the box `[xL, xU]`, so that `f(x)>=fL` for each `x` in the box.
 
 -  `plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64}; plot3DStyle::Vector = [surface!, wireframe!, surface], fEvalResolution::Int64 = 10)`
-    -  generates a plot of the convex function, affine under-estimator, and lower bound planes/lines within the given box domain for functions of n = 1 or 2.
-    - key argument `plot3DStyle` sets the plot style (ex. wireframe, surface, etc.) of each individual plot component in the set order: (1) lower bound, (2) affine under-estimator, (3) convex function.
-    - key argument `fEvalResolution` represents the plot accuracy where the number of function evaluations used for plotting is `fEvalResolution` to the exponent `n`.
-    - enter `@show` along with the graph variable name in the command window to access stored graphs (see example below).
+    -  plots `f`, its affine underestimator `fAffine`, and its lower bound `fL`, on the box domain `[xL, xU]`. `f` must be a function of either `1` or `2` variables, and must take a `Vector{Float64}` input.
+    - The key argument `plot3DStyle` sets the plot style (ex. wireframe, surface, etc.) of each individual plot component in the set order: (1) lower bound, (2) affine under-estimator, (3) convex function.
+    - The key argument `fEvalResolution` is the number of mesh rows per domain dimension in the resulting plot.
+    - The produced graph may be stored to a variable and later retrieved with `@show`; see example below.
 
 ### Key Arguments
 
-All exported functions include the listed optional key word arguments:
+All exported functions also include the following optional keyword arguments, with indicated default values:
 - `SamplingPolicy::SamplingType`:
-  - An enum datatype that determines the number of sample points calculated. The default is set to `SAMPLE_COMPASS_STAR`, which uses (2n+1) function evaluations. `SAMPLE_SIMPLEX_STAR` may be entered to access the (n+2) evaluation method. Note the (n+2) method does not currently utilize `lambda` or `epsilon`.
+  - Determines the sampling strategy and the number of evaluations of `f`. Possible values: 
+  - `SAMPLE_COMPASS_STAR` (default),  uses `(2n+1)` function evaluations in a compass-star stencil. 
+  - `SAMPLE_SIMPLEX_STAR` uses `(n+2)` evaluations instead in a simplex-star stencil. This is experimental, and does not currently utilize `lambda` or `epsilon`.
 - `alpha::Vector{Float64}`:
-  - The dimensionless step length away from the central point `w0`. A default value is set to an array of constants `DEFAULT_ALPHA = 0.1`. All components of alpha must be between `(0.0, 1.0 - lambda]`.
+  - The dimensionless step length of each sampled point from the stencil center `w0`. All components of alpha must be between `(0.0, 1.0 - lambda]`; each is set to `0.1` by default. If the step length is too small, then subtraction operations in our finite difference formulas might cause unacceptable numerical error.
 - `lambda::Vector{Float64}`:
-  - An offset for the location of `w0` to employ sampled sets where `w0` is not the midpoint of said set. A default value is set to a constant `0.0`. All components of `lambda` must be between `(-1.0, 1.0)`.
+  - An offset for the location of `w0` to employ sampling stencils where `w0` is not the domain midpoint. All components of `lambda` must be between `(-1.0, 1.0)`, and are `0.0` by default.
 - `epsilon::Float64`:
-  - Error tolerance accounting for absolute error in function evaluations; that is, within plus or minus epsilon of said evaluation. A default value is set to a constant `0.0`.
+  - An absolute error bound for evaluations of `f` we presume that each numerical evaluation of `f(x)` is within `epsilon` of the correct value. Set to `0.0` by default.
 
 ## Example
 
 The usage of `SamplingUnderestimators` is demonstrated by script [testConvex.jl](test/testConvex.jl).
-Consider the following convex function of two variables within a box domain of `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`:
+Consider the following convex quadratic function of two variables within a box domain of `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`:
 
 ```Julia
-f(x) = 〈x, [65 56; 56 65], x〉 + 〈[6; 2], x〉 + 23
+f(x) = dot(x, [65.0 56.0; 56.0 65.0], x) + dot([6.0, 2.0], x) + 23.0
 
 ```
-Using the `SamplingUnderestimators` module (after commands `include(“ConvexSampling.jl”)` and `using .SamplingUnderestimators`), we can evaluate the affine under-estimator at an input value of `x = [2.0, 2.0]`.
+Using the `SamplingUnderestimators` module (after commands `include(“ConvexSampling.jl”)` and `using .SamplingUnderestimators`), we can evaluate its affine underestimator at an input value of `x = [2.0, 2.0]`.
 - By defining f beforehand:
 ```Julia
 yOutput = eval_sampling_underestimator(f, [-5.0, -3.0], [5.0, 3.0], [2.0, 2.0])
@@ -77,14 +79,14 @@ yOutput = eval_sampling_underestimator([-5.0, -3.0], [5.0, 3.0], [2.0, 2.0]) do 
 end
 ```
 
-- By using the `construct_sampling_underestimator` function to construct an under-estimator function of the form `f(x) = c + dot(b, x – w0)` and manually computing the y-value:
+- By constructing the underestimator as a function, and then evaluating it:
 ```Julia
-fUnderestimator() = construct_sampling_underestimator(f, [-5.0, -3.0], [5.0, 3.0])
-yOutput = fUnderestimator([2.0, 2.0])
+fAffine() = construct_sampling_underestimator(f, [-5.0, -3.0], [5.0, 3.0])
+yOutput = fAffine([2.0, 2.0])
 ```
-Contructing the underestimator is worthwhile if you plan on evaluating the under-estimator at more than one x-value.
+Contructing the underestimator is worthwhile if you plan on evaluating it at more than one `x`-value.
 
-The function plane can also be plotted with the affine underestimator plane within the given box boundary:
+The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
  ```Julia
 graph = plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64})
 @show graph
@@ -92,7 +94,7 @@ graph = plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vecto
 
 ![ConvexSampleplot](https://user-images.githubusercontent.com/104848815/173203263-26bdc553-c1b5-496a-913f-eeb0553461d7.png)
 
-Note that if the plot_sampling_underestimator function is entered directly into the command window, the `@show` command is not required.
+Note that if the `plot_sampling_underestimator` function is entered directly into the command window, the `@show` command is not required.
 
 # References
 

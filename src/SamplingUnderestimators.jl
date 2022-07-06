@@ -56,10 +56,8 @@ function sample_convex_function(
     lambda::Vector{Float64} = zeros(length(xL)), # dimesionless offset of sampling stencil
     epsilon::Float64 = 0.0 # absolute error in evaluating f
 )
-    n = length(xL) # dimension of f
-
     # verify consistency of inputs
-    if length(xU) != n
+    if length(xU) != length(xL)
         throw(DomainError("xL and xU: length of xL and xU must be equal"))
     end #if
     if !(xL <= xU)
@@ -91,21 +89,6 @@ function sample_convex_function(
         throw(DomainError("unsupported samplingPolicy"))
     end #if
     return w0, y0, wStep, yPlus, yMinus
-end #function
-
-# permit scalar inputs for f
-function sample_convex_function(
-    f::Function, # must be convex and of the form f(x::Float64)::Float64
-    xL::Float64,
-    xU::Float64;
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Float64 = DEFAULT_ALPHA,
-    lambda::Float64 = 0.0,
-    epsilon::Float64 = 0.0
-)
-    fMultiVar(x) = f(x[1])
-    sample_convex_function(fMultiVar, [xL], [xU];
-                           samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
 # compute coefficients c, b, w0 so that:
@@ -185,8 +168,10 @@ function eval_sampling_underestimator_coeffs(
     epsilon::Float64 = 0.0
 )
     fMultiVar(x) = f(x[1])
-    eval_sampling_underestimator_coeffs(fMultiVar, [xL], [xU];
-                                        samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
+    w0Vec, bVec, c, sR =
+        eval_sampling_underestimator_coeffs(fMultiVar, [xL], [xU];
+                                            samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
+    return w0Vec[1], b[1], c, sR[1]
 end #function
 
 # define affine underestimator function using calculated b, c coefficients:
@@ -215,7 +200,7 @@ function construct_sampling_underestimator(
     epsilon::Float64 = 0.0
 )
     fMultiVar(x) = f(x[1])
-    construct_sampling_underestimator(fMultiVar, [xL], [xU];
+    return construct_sampling_underestimator(fMultiVar, [xL], [xU];
                                       samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
@@ -232,9 +217,9 @@ function eval_sampling_underestimator(
     lambda::Vector{Float64} = zeros(length(xL)),
     epsilon::Float64 = 0.0
 )
-    affinefunc = construct_sampling_underestimator(f, xL, xU;
+    fAffine = construct_sampling_underestimator(f, xL, xU;
                                                    samplingPolicy, alpha, lambda, epsilon)
-    return affinefunc(xIn)
+    return fAffine(xIn)
 end #function
 
 # affine underestimator y-value using scalar inputs for univariate functions:
@@ -249,7 +234,7 @@ function eval_sampling_underestimator(
     epsilon::Float64 = 0.0
 )
     fMultiVar(x) = f(x[1])
-    eval_sampling_underestimator(fMultiVar, [xL], [xU], [xIn];
+    return eval_sampling_underestimator(fMultiVar, [xL], [xU], [xIn];
                                  samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
@@ -298,7 +283,7 @@ function eval_sampling_lower_bound(
     epsilon::Float64 = 0.0
 )
     fMultiVar(x) = f(x[1])
-    eval_sampling_lower_bound(fMultiVar, [xL], [xU];
+    return eval_sampling_lower_bound(fMultiVar, [xL], [xU];
                               samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
 end #function
 
