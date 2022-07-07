@@ -49,7 +49,7 @@ The following functions are exported by `SamplingUnderestimators`:
 ### Key arguments
 
 All exported functions also include the following optional keyword arguments, with indicated default values:
-- `SamplingPolicy::SamplingType`:
+- `samplingPolicy::SamplingType`:
   - Determines the sampling strategy and the number of evaluations of `f`. Possible values: 
   - `SAMPLE_COMPASS_STAR` (default),  uses `(2n+1)` function evaluations in a compass-star stencil. 
   - `SAMPLE_SIMPLEX_STAR` uses `(n+2)` evaluations instead in a simplex-star stencil. This is experimental, and does not currently utilize `lambda` or `epsilon`.
