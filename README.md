@@ -67,31 +67,31 @@ Consider the following convex quadratic function of two variables within a box d
 
 ```Julia
 f(x) = dot(x, [65.0 56.0; 56.0 65.0], x) + dot([6.0, 2.0], x) + 23.0
-
 ```
-Using the `SamplingUnderestimators` module (after commands `include(“ConvexSampling.jl”)` and `using .SamplingUnderestimators`), we can evaluate its affine underestimator at an input value of `x = [2.0, 2.0]`.
+
+Using the `SamplingUnderestimators` module (after commands `include(“ConvexSampling.jl”)` and `using .SamplingUnderestimators`), we can evaluate its affine underestimator at an input value of `xIn = [2.0, 2.0]`.
 - By defining f beforehand:
   ```Julia
-  yOutput = eval_sampling_underestimator(f, [-5.0, -3.0], [5.0, 3.0], [2.0, 2.0])
+  yOutput = eval_sampling_underestimator(f, xL, xU, xIn)
   ```
 
 - By defining f as an anonymous function:
   ```Julia
-  yOutput = eval_sampling_underestimator([-5.0, -3.0], [5.0, 3.0], [2.0, 2.0]) do x
+  yOutput = eval_sampling_underestimator(xL, xU, xIn) do x
       dot(x,[65 56; 56 65], x) + dot([6;2], x) + 23
   end
   ```
 
 - By constructing the underestimator as a function, and then evaluating it:
   ```Julia
-  fAffine() = construct_sampling_underestimator(f, [-5.0, -3.0], [5.0, 3.0])
-  yOutput = fAffine([2.0, 2.0])
+  fAffine() = construct_sampling_underestimator(f, xL, xU)
+  yOutput = fAffine(xIn)
   ```
-Contructing the underestimator is worthwhile if you plan on evaluating it at more than one `x`-value.
+Contructing the underestimator is worthwhile if you plan on evaluating it at more than one `xIn`-value.
 
 The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
    ```Julia
-  graph = plot_sampling_underestimator(f::Function, xL::Vector{Float64}, xU::Vector{Float64})
+  graph = plot_sampling_underestimator(f, xL, xU)
   @show graph
    ```
 
