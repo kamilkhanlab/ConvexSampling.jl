@@ -58,23 +58,23 @@ function sample_convex_function(
 )
     # verify consistency of inputs
     if length(xU) != length(xL)
-        throw(DomainError("xL and xU: length of xL and xU must be equal"))
+        throw(DomainError("xL and xU", "must have the same dimension"))
     end #if
     if !(xL <= xU)
-        throw(DomainError("xL and xU: must have xL[i]<=xU[i] for each i"))
+        throw(DomainError("xL and xU", "must have xL[i]<=xU[i] for each i"))
     end #if
     if !all(0.0 .< alpha .<= (1.0 .- lambda))
-        throw(DomainError("alpha: each component must be between 0.0 and (1.0-lambda)"))
+        throw(DomainError(:alpha, "each component must be between 0.0 and (1.0-lambda)"))
     end #if
     if !all(-1.0 .< lambda .< 1.0)
-        throw(DomainError("lambda: each component must be between -1.0 and 1.0"))
+        throw(DomainError(:lambda, "each component must be between -1.0 and 1.0"))
     end #if
 
     # sample midpoint of stencil
     w0 = @. 0.5*(1 + lambda)*(xL + xU)
     y0 = f(w0)
     if !(y0 isa Float64)
-        throw(DomainError("f: function output must be scalar Float64"))
+        throw(DomainError(:f, "function output must be scalar Float64"))
     end #if
 
     # sample other points in stencil
@@ -86,8 +86,8 @@ function sample_convex_function(
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         yMinus = [f(w0 - wStep)]
     else
-        throw(DomainError("unsupported samplingPolicy"))
-    end #if
+        throw(DomainError(:samplingPolicy, "unsupported sampling method"))
+    end # if    
     return w0, y0, wStep, yPlus, yMinus
 end #function
 
@@ -151,7 +151,7 @@ function eval_sampling_underestimator_coeffs(
         c = y0 - 0.5.*dot(sR, xU - xL)
 
     else
-        throw(DomainError("unsupported samplingPolicy"))
+        throw(DomainError(:samplingPolicy, "unsupported sampling method"))
     end #if
 
     return w0, b, c, sR
@@ -303,8 +303,8 @@ function plot_sampling_underestimator(
     plot3DStyle::Vector = [surface!, wireframe!, surface], #Set plot style
     fEvalResolution::Int64 = 10 #Set # of function evaluations as points^n
 )
-    if !all(xU .> xL)
-        throw(DomainError("xL and xU: each component of xU must be greater than its respective component in xL"))
+    if !(xU > xL)
+        throw(DomainError("xL and xU", "for plotting, we must have xU[i] > xL[i] for each i"))
     end
 
     n = length(xL)
@@ -361,8 +361,8 @@ function plot_sampling_underestimator(
         plot3DStyle[1](x1range, x2range, yMeshF, colorbar=colorBar,
                        title="From top to bottom: (1) Original function,
                 (2) Affine underestimator, and (3) Lower bound",
-                       titlefontsize=10, xlabel = "x₁ axis", ylabel = "x₂ axis",
-                       zlabel = "y axis", label = "Function", c=:dense)
+                       titlefontsize=10, xlabel = "x₁", ylabel = "x₂",
+                       zlabel = "y", label = "Function", c=:dense)
         wPlus = w0 .+ diagm(wStep)
         if samplingPolicy == SAMPLE_COMPASS_STAR
             wMinus= w0 .- diagm(wStep)
@@ -374,7 +374,7 @@ function plot_sampling_underestimator(
                  [y0; yPlus; yMinus],
                  c=:purple, legend=false)
     else
-        throw(DomainError("function dimension: must be 1 or 2"))
+        throw(DomainError(:f, "dimension must be 1 or 2"))
     end #if
 end #function
 
