@@ -1,9 +1,9 @@
 # convex-sampling
 
 In [our recent paper](https://doi.org/10.1016/j.compchemeng.2021.107413), we presented a new approach for generating a guaranteed affine underestimator for a black-box convex function on a box domain, by tractable derivative-free sampling.
-In this repository, the `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides a Julia implementation  of our new sampling approach, along with an experimental approach that uses fewer samples.
+In this repository, the `SamplingUnderestimators` module in [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) provides a Julia implementation of our new sampling approach, along with an experimental approach that uses fewer samples.
 
-This implementation uses `Plots.jl` to generate plots. Tested in Julia v.1.7. Primarily written by Maha Chaudhry.
+This implementation uses `Plots.jl` to generate plots. Tested in Julia v.1.7. This implementation was primarily written by Maha Chaudhry.
 
 ## Method outline
 
