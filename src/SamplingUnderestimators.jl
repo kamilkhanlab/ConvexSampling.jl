@@ -250,11 +250,11 @@ function eval_sampling_lower_bound(
     epsilon::Float64 = 0.0
 )
     n = length(xL)
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
-                                                          samplingPolicy, alpha, lambda, epsilon)
 
     #coefficient c can be tightened in special cases where f is univariate:
     if n == 1 && epsilon == 0.0 && lambda == zeros(n)
+        w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
+                                                              samplingPolicy, alpha, lambda, epsilon)
         fL = (@. min(2.0*y0-yPlus,
                      2.0*y0-yMinus,
                      (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
@@ -264,10 +264,14 @@ function eval_sampling_lower_bound(
                                                            samplingPolicy, alpha, lambda, epsilon)
         fL = y0 .- 0.5.*sum(abs.(b).*abs.(xL - xU)) .- 0.5*dot(sR, xU - xL)
     elseif samplingPolicy == SAMPLE_COMPASS_STAR
+        w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
+                                                              samplingPolicy, alpha, lambda, epsilon)
         fL = y0 - epsilon
         for (lambdaI, yPlusI, yMinusI, alphaI) in zip(lambda, yPlus, yMinus, alpha)
             fL -= ((1.0 + abs(lambdaI))*(max(yPlusI, yMinusI) - y0 + 2.0*epsilon))/alphaI
         end #for
+    else
+        throw(DomainError(:samplingPolicy, "unsupported sampling policy requested"))
     end #if
     return fL
 end #function
