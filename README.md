@@ -53,12 +53,12 @@ All exported functions also include the following optional keyword arguments, wi
   - Determines the sampling strategy and the number of evaluations of `f`. Possible values: 
   - `SAMPLE_COMPASS_STAR` (default),  uses `(2n+1)` function evaluations in a compass-star stencil. 
   - `SAMPLE_SIMPLEX_STAR` uses `(n+2)` evaluations instead in a simplex-star stencil. This is experimental, and does not currently utilize `lambda` or `epsilon`.
-- `alpha::Vector{Float64}`:
-  - The dimensionless step length of each sampled point from the stencil center `w0`. All components of alpha must be between `(0.0, 1.0 - lambda]`; each is set to `0.1` by default. If the step length is too small, then subtraction operations in our finite difference formulas might cause unacceptable numerical error.
 - `lambda::Vector{Float64}`:
   - An offset for the location of `w0` to employ sampling stencils where `w0` is not the domain midpoint. All components of `lambda` must be between `(-1.0, 1.0)`, and are `0.0` by default.
+- `alpha::Vector{Float64}`:
+  - The dimensionless step length of each sampled point from the stencil center `w0`. Each component `alpha[i]` must satisfy `0.0 < alpha[i] <= 1.0 - lambda[i]`, and is set to `0.1` by default. If the step length is too small, then subtraction operations in our finite difference formulas might cause unacceptable numerical error.
 - `epsilon::Float64`:
-  - An absolute error bound for evaluations of `f` we presume that each numerical evaluation of `f(x)` is within `epsilon` of the correct value. Set to `0.0` by default.
+  - An absolute error bound for evaluations of `f` we presume that each numerical evaluation of `f(x)` is within `epsilon` of the true value. Set to `0.0` by default.
 
 ## Example
 
