@@ -53,7 +53,7 @@ The function `f` may be plotted with its sampling-based underestimator `fAffine`
 
 ![ConvexSampleplot](https://user-images.githubusercontent.com/104848815/173203263-26bdc553-c1b5-496a-913f-eeb0553461d7.png)
 
-Note that if the `plot_sampling_underestimator` function is entered direction in the REPL, the `@show` command is not required.
+Note that if the `plot_sampling_underestimator` function is entered directly in the REPL, the `@show` command is not required.
 
 ## Method outline
 
