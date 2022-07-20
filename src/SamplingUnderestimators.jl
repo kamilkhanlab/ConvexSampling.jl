@@ -71,7 +71,7 @@ function sample_convex_function(
     end #if
 
     # sample midpoint of stencil
-    w0 = @. 0.5*(1 + lambda)*(xL + xU)
+    w0 = @. 0.5*(xL + xU) + 0.5*lambda*(xU - xL)
     y0 = f(w0)
     if !(y0 isa Float64)
         throw(DomainError(:f, "function output must be scalar Float64"))
@@ -87,7 +87,7 @@ function sample_convex_function(
         yMinus = [f(w0 - wStep)]
     else
         throw(DomainError(:samplingPolicy, "unsupported sampling method"))
-    end # if    
+    end # if
     return w0, y0, wStep, yPlus, yMinus
 end #function
 
@@ -129,7 +129,7 @@ function eval_sampling_underestimator_coeffs(
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
         end #if
-        sR = [] 
+        sR = []
 
         #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
