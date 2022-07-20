@@ -5,6 +5,56 @@ In this repository, the `SamplingUnderestimators` module in [SamplingUnderestima
 
 This implementation uses `Plots.jl` to generate plots. Tested in Julia v.1.7. This implementation was primarily written by Maha Chaudhry.
 
+## Example
+
+This example is implemented in [testConvex.jl](test/testConvex.jl).
+Consider the following convex quadratic function: 
+```Julia
+f(x) = dot(x, [65.0 56.0; 56.0 65.0], x) + dot([6.0, 2.0], x) + 23.0
+```
+on the box domain: `xL[i] <= x[i] <= xU[i]`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
+
+First, apply the module:
+```julia
+include("ConvexSampling.jl")
+using .SamplingUnderestimators
+```
+Then, by any of the following approaches, we can construct a guaranteed affine underestimator of `f` by sampling it at 5 domain points, and then evaluate that underestimator at `xIn = [2.0, 2.0]`:
+- By defining f beforehand:
+  ```Julia
+  yOutput = eval_sampling_underestimator(f, xL, xU, xIn)
+  ```
+
+- By defining f as an anonymous function:
+  ```Julia
+  yOutput = eval_sampling_underestimator(xL, xU, xIn) do x
+      dot(x,[65 56; 56 65], x) + dot([6;2], x) + 23
+  end
+  ```
+
+- By constructing the underestimator as a function, and then evaluating it:
+  ```Julia
+  fAffine() = construct_sampling_underestimator(f, xL, xU)
+  yOutput = fAffine(xIn)
+  ```
+Contructing the underestimator is worthwhile if you plan on evaluating it at more than one `xIn`-value.
+
+We can also evaluate a guaranteed lower bound of `f` on its box domain:
+```julia
+fL = eval_sampling_lower_bound(f, xL, xU)
+```
+Thus, we will have `f(x) >= fL` for each `x` in the  domain.
+
+The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
+   ```Julia
+  graph = plot_sampling_underestimator(f, xL, xU)
+  @show graph
+   ```
+
+![ConvexSampleplot](https://user-images.githubusercontent.com/104848815/173203263-26bdc553-c1b5-496a-913f-eeb0553461d7.png)
+
+Note that if the `plot_sampling_underestimator` function is entered direction in the REPL, the `@show` command is not required.
+
 ## Method outline
 
 Suppose we have a convex function `f` of `n` variables, defined on a box domain `X = [xL, xU]`. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples `f` at `2n+1` domain points: the midpoint of `X`, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for `f` on `X`. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of `f` at the midpoint of `X`. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
@@ -59,45 +109,6 @@ All exported functions also include the following optional keyword arguments, wi
   - The dimensionless step length of each sampled point from the stencil center `w0`. Each component `alpha[i]` must satisfy `0.0 < alpha[i] <= 1.0 - lambda[i]`, and is set to `0.1` by default. If the step length is too small, then subtraction operations in our finite difference formulas might cause unacceptable numerical error.
 - `epsilon::Float64`:
   - An absolute error bound for evaluations of `f` we presume that each numerical evaluation of `f(x)` is within `epsilon` of the true value. Set to `0.0` by default.
-
-## Example
-
-The usage of `SamplingUnderestimators` is demonstrated by script [testConvex.jl](test/testConvex.jl).
-Consider the following convex quadratic function of two variables within a box domain of `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`:
-
-```Julia
-f(x) = dot(x, [65.0 56.0; 56.0 65.0], x) + dot([6.0, 2.0], x) + 23.0
-```
-
-Using the `SamplingUnderestimators` module (after commands `include(“ConvexSampling.jl”)` and `using .SamplingUnderestimators`), we can evaluate its affine underestimator at an input value of `xIn = [2.0, 2.0]`.
-- By defining f beforehand:
-  ```Julia
-  yOutput = eval_sampling_underestimator(f, xL, xU, xIn)
-  ```
-
-- By defining f as an anonymous function:
-  ```Julia
-  yOutput = eval_sampling_underestimator(xL, xU, xIn) do x
-      dot(x,[65 56; 56 65], x) + dot([6;2], x) + 23
-  end
-  ```
-
-- By constructing the underestimator as a function, and then evaluating it:
-  ```Julia
-  fAffine() = construct_sampling_underestimator(f, xL, xU)
-  yOutput = fAffine(xIn)
-  ```
-Contructing the underestimator is worthwhile if you plan on evaluating it at more than one `xIn`-value.
-
-The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
-   ```Julia
-  graph = plot_sampling_underestimator(f, xL, xU)
-  @show graph
-   ```
-
-![ConvexSampleplot](https://user-images.githubusercontent.com/104848815/173203263-26bdc553-c1b5-496a-913f-eeb0553461d7.png)
-
-Note that if the `plot_sampling_underestimator` function is entered direction in the REPL, the `@show` command is not required.
 
 # References
 
