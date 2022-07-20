@@ -16,16 +16,16 @@ on the box domain: `xL[i] <= x[i] <= xU[i]` for `i` in `1:2`, with `xL = [-5.0, 
 
 First, apply the module:
 ```julia
-include("ConvexSampling.jl")
+include("SamplingUnderestimators.jl")
 using .SamplingUnderestimators
 ```
 Then, by any of the following approaches, we can construct a guaranteed affine underestimator of `f` by sampling it at 5 domain points, and then evaluate that underestimator at `xIn = [2.0, 2.0]`:
-- By defining f beforehand:
+- By defining `f` beforehand:
   ```Julia
   yOutput = eval_sampling_underestimator(f, xL, xU, xIn)
   ```
 
-- By defining f as an anonymous function:
+- By defining `f` as an anonymous function:
   ```Julia
   yOutput = eval_sampling_underestimator(xL, xU, xIn) do x
       dot(x,[65 56; 56 65], x) + dot([6;2], x) + 23
