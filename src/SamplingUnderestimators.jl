@@ -79,7 +79,7 @@ function sample_convex_function(
 
     # sample other points in stencil
     wStep = @. 0.5*alpha*(xU - xL)
-    wStepDiag = diagm(wStep)
+    wStepDiag = Diagonal(wStep)
     yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ wStepDiag)]
     if samplingPolicy == SAMPLE_COMPASS_STAR
         yMinus = [f(wMinus) for wMinus in eachcol(w0 .- wStepDiag)]
