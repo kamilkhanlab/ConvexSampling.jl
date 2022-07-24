@@ -212,13 +212,9 @@ function eval_sampling_underestimator(
     xL::Vector{Float64},
     xU::Vector{Float64},
     xIn::Vector{Float64}; #define x-input value
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-    lambda::Vector{Float64} = zeros(length(xL)),
-    epsilon::Float64 = 0.0
+    kwargs...
 )
-    fAffine = construct_sampling_underestimator(f, xL, xU;
-                                                   samplingPolicy, alpha, lambda, epsilon)
+    fAffine = construct_sampling_underestimator(f, xL, xU; kwargs...)
     return fAffine(xIn)
 end #function
 
