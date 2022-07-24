@@ -19,31 +19,21 @@ First, apply the module:
 include("SamplingUnderestimators.jl")
 using .SamplingUnderestimators
 ```
-Then, by any of the following approaches, we can construct a guaranteed affine underestimator of `f` by sampling it at 5 domain points, and then evaluate that underestimator at `xIn = [2.0, 2.0]`:
-- By defining `f` beforehand:
-  ```Julia
-  yOutput = eval_sampling_underestimator(f, xL, xU, xIn)
-  ```
-
-- By defining `f` as an anonymous function:
-  ```Julia
-  yOutput = eval_sampling_underestimator(xL, xU, xIn) do x
-      dot(x,[65 56; 56 65], x) + dot([6;2], x) + 23
-  end
-  ```
-
-- By constructing the underestimator as a function, and then evaluating it:
-  ```Julia
-  fAffine() = construct_sampling_underestimator(f, xL, xU)
-  yOutput = fAffine(xIn)
-  ```
-Contructing the underestimator is worthwhile if you plan on evaluating it at more than one `xIn`-value.
+Then, we can construct a guaranteed affine underestimator of `f` by sampling it at 5 domain points:
+```julia
+fAffine = construct_sampling_underestimator(f, xL, xU) 
+```
+Alternatively, we can obtain this underestimator as its constant coefficients:
+```julia
+w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU)
+```
+Then, we will have `f(x) == c + dot(b, x - w0)` for all `x`. Since `fAffine` underestimates `f` on its box domain, we will also have `fAffine(x) <= f(x)` whenever `xL <= x <= xU`.
 
 We can also evaluate a guaranteed lower bound of `f` on its box domain:
 ```julia
 fL = eval_sampling_lower_bound(f, xL, xU)
 ```
-Thus, we will have `f(x) >= fL` for each `x` in the  domain.
+Then, we will have `f(x) >= fL` for each `x` in the domain.
 
 The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
    ```Julia
