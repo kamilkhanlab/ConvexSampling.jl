@@ -90,7 +90,7 @@ The following functions are exported by `SamplingUnderestimators`:
 
 All exported functions also include the following optional keyword arguments, with indicated default values:
 - `samplingPolicy::SamplingType`:
-  - Determines the sampling strategy and the number of evaluations of `f`. Possible values: 
+  - An `enum` that specifies the sampling strategy and the number of evaluations of `f`. Possible values: 
   - `SAMPLE_COMPASS_STAR` (default),  uses `(2n+1)` function evaluations in a compass-star stencil, where `n` is the domain dimension of `f`. 
   - `SAMPLE_SIMPLEX_STAR` uses `(n+2)` evaluations instead in a simplex-star stencil. This is experimental, and does not currently utilize `lambda` or `epsilon`.
 - `lambda::Vector{Float64}`:
