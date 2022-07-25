@@ -129,7 +129,7 @@ function eval_sampling_underestimator_coeffs(
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
         end #if
-        sR = []
+        sR = similar(b)
 
         #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
