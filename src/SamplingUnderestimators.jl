@@ -374,7 +374,7 @@ function plot_sampling_underestimator(
                  [y0; yPlus; yMinus],
                  c=:purple, legend=false)
     else
-        throw(DomainError(:f, "dimension must be 1 or 2"))
+        throw(DomainError(:f, "domain dimension must be 1 or 2"))
     end #if
 end #function
 
