@@ -53,7 +53,7 @@ function sample_convex_function(
     xU::Vector{Float64};
     samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
-    lambda::Vector{Float64} = zeros(length(xL)), # dimesionless offset of sampling stencil
+    lambda::Vector{Float64} = zeros(length(xL)), # dimensionless offset of sampling stencil
     epsilon::Float64 = 0.0 # absolute error in evaluating f
 )
     # verify consistency of inputs
@@ -102,7 +102,7 @@ function eval_sampling_underestimator_coeffs(
     xU::Vector{Float64};
     samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
-    lambda::Vector{Float64} = zeros(length(xL)), # dimesionless offset of sampling stencil
+    lambda::Vector{Float64} = zeros(length(xL)), # dimensionless offset of sampling stencil
     epsilon::Float64 = 0.0 # absolute error in evaluating f
 )
     n = length(xL)
@@ -181,7 +181,7 @@ function construct_sampling_underestimator(
     xU::Vector{Float64};
     samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
     alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
-    lambda::Vector{Float64} = zeros(length(xL)), # dimesionless offset of sampling stencil
+    lambda::Vector{Float64} = zeros(length(xL)), # dimensionless offset of sampling stencil
     epsilon::Float64 = 0.0 # absolute error in evaluating f
 )
     w0, b, c, _ = eval_sampling_underestimator_coeffs(f, xL, xU;
@@ -258,7 +258,7 @@ function eval_sampling_lower_bound(
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU;
                                                            samplingPolicy, alpha, lambda, epsilon)
-        fL = y0 - 0.5*dot(abs.(b), abs.(xL - xU)) - 0.5*dot(sR, xU - xL)
+        fL = y0 - 0.5*dot(abs.(b), abs.(xU - xL)) - 0.5*dot(sR, xU - xL)
     elseif samplingPolicy == SAMPLE_COMPASS_STAR
         w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
                                                               samplingPolicy, alpha, lambda, epsilon)
@@ -267,7 +267,7 @@ function eval_sampling_lower_bound(
             fL -= ((1.0 + abs(lambdaI))*(max(yPlusI, yMinusI) - y0 + 2.0*epsilon))/alphaI
         end #for
     else
-        throw(DomainError(:samplingPolicy, "unsupported sampling policy requested"))
+        throw(DomainError(:samplingPolicy, "unsupported sampling method"))
     end #if
     return fL
 end #function
