@@ -258,7 +258,7 @@ function eval_sampling_lower_bound(
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU;
                                                            samplingPolicy, alpha, lambda, epsilon)
-        fL = y0 .- 0.5.*sum(abs.(b).*abs.(xL - xU)) .- 0.5*dot(sR, xU - xL)
+        fL = y0 - 0.5*dot(abs.(b), abs.(xL - xU)) - 0.5*dot(sR, xU - xL)
     elseif samplingPolicy == SAMPLE_COMPASS_STAR
         w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
                                                               samplingPolicy, alpha, lambda, epsilon)
