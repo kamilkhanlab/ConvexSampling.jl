@@ -122,10 +122,8 @@ function eval_sampling_underestimator_coeffs(
         c = y0[1]
         if n > 1
             c -= epsilon
-            for (lambdaI, yPlusI, yMinusI, alphaI) in zip(lambda, yPlus, yMinus, alpha)
-                c -= ((1.0 + abs(lambdaI))*(yPlusI + yMinusI
-                                              - 2.0*y0 + 4.0*epsilon))/(2.0*alphaI)
-            end #for
+            c -= sum((1.0 .+ abs.(lambda)).*(yPlus .+ yMinus
+                                             .- 2.0*y0 .+ 4.0*epsilon)./(2.0*alpha); init=0.0)
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
         end #if
@@ -136,13 +134,8 @@ function eval_sampling_underestimator_coeffs(
         sU = @. 2.0*(yPlus - y0)/abs(2.0*wStep)
         sL = zeros(n)
         for (i, wStepI) in zip(eachindex(sL), wStep)
-            yjSum = 0.0
-            for (j, yPlusJ) in enumerate(yPlus)
-                if j != i
-                    yjSum += y0 - yPlusJ
-                end #for
-            end #for
-            sL[i] = @. 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStepI)
+            yjSum = sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0)
+            sL[i] = 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStepI)
         end #for
         b = 0.5.*(sL + sU)
 
@@ -263,9 +256,7 @@ function eval_sampling_lower_bound(
         w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
                                                               samplingPolicy, alpha, lambda, epsilon)
         fL = y0 - epsilon
-        for (lambdaI, yPlusI, yMinusI, alphaI) in zip(lambda, yPlus, yMinus, alpha)
-            fL -= ((1.0 + abs(lambdaI))*(max(yPlusI, yMinusI) - y0 + 2.0*epsilon))/alphaI
-        end #for
+        fL -= sum((1.0 .+ abs.(lambda)).*(max.(yPlus, yMinus) .- y0 .+ 2.0*epsilon)./alpha; init=0.0)
     else
         throw(DomainError(:samplingPolicy, "unsupported sampling method"))
     end #if
