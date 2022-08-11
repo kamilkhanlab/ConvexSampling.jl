@@ -8,9 +8,12 @@ This implementation uses `Plots.jl` to generate plots. Tested in Julia v.1.7. Th
 ## Example
 
 This example is implemented in [testConvex.jl](test/testConvex.jl).
-Consider the following convex quadratic function: 
+Consider the following convex quadratic function `f`: 
 ```Julia
-f(x) = dot(x, [65.0 56.0; 56.0 65.0], x) + dot([6.0, 2.0], x) + 23.0
+A = [65.0 56.0; 56.0 65.0]
+b = [6.0, 2.0]
+c = 23.0
+f(x) = dot(x, A, x) + dot(b, x) + c
 ```
 on the box domain: `xL[i] <= x[i] <= xU[i]` for `i` in `1:2`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
