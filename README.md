@@ -26,7 +26,8 @@ Then, we can construct a guaranteed affine underestimator of `f` by sampling it 
 ```julia
 fAffine = construct_sampling_underestimator(f, xL, xU) 
 ```
-In general, a function of `n` variables will be sampled `(2n+1)` times to construct an underestimator.
+(In general, a function of `n` variables will be sampled `(2n+1)` times to construct an underestimator.)
+
 The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL <= x <= xU`. We can instead obtain this underestimator as its constant coefficients:
 ```julia
 w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU)
