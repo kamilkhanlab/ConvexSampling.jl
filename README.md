@@ -17,7 +17,7 @@ f(x) = dot(x, A, x) + dot(b, x) + c
 ```
 on the box domain: `xL[i] <= x[i] <= xU[i]` for `i` in `1:2`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
-First, apply the module:
+First, let's load the module:
 ```julia
 include("SamplingUnderestimators.jl")
 using .SamplingUnderestimators
@@ -26,6 +26,7 @@ Then, we can construct a guaranteed affine underestimator of `f` by sampling it 
 ```julia
 fAffine = construct_sampling_underestimator(f, xL, xU) 
 ```
+In general, a function of `n` variables will be sampled `(2n+1)` times to construct an underestimator.
 The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL <= x <= xU`. We can instead obtain this underestimator as its constant coefficients:
 ```julia
 w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU)
