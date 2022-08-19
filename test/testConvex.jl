@@ -9,7 +9,6 @@ the results of calculations from the following article:
 An alternate method under construction has also been implemented to evaluate
 the function with fewer sample points.
 =#
-# TODO: @Test package
 # just show the outputs
 # get numbers from a second source - MATLAB?
 # no visual regression for plot - may ignore
@@ -20,7 +19,21 @@ using .ConvexSampling
 using LinearAlgebra
 using Plots
 
+## Test Package:
 ##
+using Test
+
+@testset "Example 1: A function with 1 variable:" begin
+    f1(x) = @. (2)*x[1]^2 + (5)*x[1] + 3 + (2)*abs(x[1] - 2)
+    xL = [-3.0]
+    xU = [3.0]
+    @test eval_sampling_underestimator_coeffs(f1, xL, xU) ==
+
+end
+
+
+##
+#=
 println("Running Example 1: A function with 1 variable:\n")
 
 f1(x) = @. (2)*x[1]^2 + (5)*x[1] + 3 + (2)*abs(x[1] - 2)
@@ -76,3 +89,4 @@ println("At x = ", [1.0, 1.0, 1.0], " the affine underestimator outputs ", yOutp
 
 fL3 = eval_sampling_lower_bound(f3, xL,xU)
 println("The lower bound (fL) is = ", fL3, ".\n")
+=#
