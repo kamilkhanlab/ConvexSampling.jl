@@ -9,6 +9,10 @@ the results of calculations from the following article:
 An alternate method under construction has also been implemented to evaluate
 the function with fewer sample points.
 =#
+# TODO: @Test package
+# just show the outputs
+# get numbers from a second source - MATLAB?
+# no visual regression for plot - may ignore
 
 include("../src/ConvexSampling.jl")
 
