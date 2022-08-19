@@ -10,9 +10,9 @@ An alternate method under construction has also been implemented to evaluate
 the function with fewer sample points.
 =#
 
-include("../src/SamplingUnderestimators.jl")
+include("../src/ConvexSampling.jl")
 
-using .SamplingUnderestimators
+using .ConvexSampling
 using LinearAlgebra
 using Plots
 
