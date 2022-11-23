@@ -28,7 +28,8 @@ export SamplingType, SAMPLE_COMPASS_STAR, SAMPLE_SIMPLEX_STAR,
     construct_sampling_underestimator,
     eval_sampling_underestimator,
     eval_sampling_lower_bound,
-    plot_sampling_underestimator
+    plot_sampling_underestimator,
+    sample_convex_function
 
 ## define affine under-estimator function operations, given a convex function f
 ## defined on a box domain with a Vector input
@@ -188,7 +189,7 @@ function eval_sampling_underestimator_coeffs(
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
         end #if
-        sR = similar(b)
+        sR = Array{Float64}(undef, n, 1)
 
         #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR

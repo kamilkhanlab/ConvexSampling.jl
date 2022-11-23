@@ -9,31 +9,15 @@ the results of calculations from the following article:
 An alternate method under construction has also been implemented to evaluate
 the function with fewer sample points.
 =#
-# just show the outputs
-# get numbers from a second source - MATLAB?
-# no visual regression for plot - may ignore
 
 include("../src/ConvexSampling.jl")
 
 using .ConvexSampling
 using LinearAlgebra
 using Plots
-
-## Test Package:
-##
 using Test
 
-@testset "Example 1: A function with 1 variable:" begin
-    f1(x) = @. (2)*x[1]^2 + (5)*x[1] + 3 + (2)*abs(x[1] - 2)
-    xL = [-3.0]
-    xU = [3.0]
-    @test eval_sampling_underestimator_coeffs(f1, xL, xU) ==
-
-end
-
-
 ##
-#=
 println("Running Example 1: A function with 1 variable:\n")
 
 f1(x) = @. (2)*x[1]^2 + (5)*x[1] + 3 + (2)*abs(x[1] - 2)
@@ -81,6 +65,8 @@ xL = [-5.0, -2.0, -1.0]
 xU = [6.0, 3.0, 7.0]
 println("Function: f3(x) = dot(x,(",[66 36 30; 36 33 36; 30 36 66],"),x) + dot(",[6;2;6],",x) + ",23," \n with bounds x = ",xL," and ",xU,".\n")
 
+display(sample_convex_function(f3, xL, xU))
+
 _, bcoeff3, ccoeff3 = eval_sampling_underestimator_coeffs(f3, xL, xU)
 println("Calculated b and c coefficients are ", bcoeff3, " and ", ccoeff3, " respectively.\n")
 
@@ -89,4 +75,3 @@ println("At x = ", [1.0, 1.0, 1.0], " the affine underestimator outputs ", yOutp
 
 fL3 = eval_sampling_lower_bound(f3, xL,xU)
 println("The lower bound (fL) is = ", fL3, ".\n")
-=#
