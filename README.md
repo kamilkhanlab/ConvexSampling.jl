@@ -28,7 +28,7 @@ fAffine = construct_sampling_underestimator(f, xL, xU)
 ```
 (In general, a function of `n` variables will be sampled `(2n+1)` times to construct an underestimator.)
 
-The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL <= x <= xU`. We can instead obtain this underestimator as its constant coefficients:
+The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL .<= x .<= xU`. We can instead obtain this underestimator as its constant coefficients:
 ```julia
 w0, b, c = eval_sampling_underestimator_coeffs(f, xL, xU)
 ```
@@ -52,11 +52,11 @@ Note that if the `plot_sampling_underestimator` function is entered directly in 
 
 ## Method outline
 
-Suppose we have a convex function `f` of `n` variables, defined on a box domain `X = [xL, xU]`. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples `f` at `2n+1` domain points: the midpoint of `X`, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for `f` on `X`. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of `f` at the midpoint of `X`. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
+Suppose we have a convex function $f$ of $n$ variables, defined on a box domain $X = [\mathbf{x}^L, \mathbf{x}^U]$. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples $f$ at $(2n+1)$ domain points: the midpoint of $x$, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for $f$ on $X$. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of $f$ at the midpoint of $X$. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
 
-As in our paper, this implementation also allows for absolute error in evaluating `f`, and for off-center sampling stencils. When `n=1`, we additionally exploit the fact that each domain point is collinear with all three sampled points.
+As in our paper, this implementation also allows for absolute error in evaluating $f$, and for off-center sampling stencils. When $n=1$, we additionally exploit the fact that each domain point is collinear with all three sampled points.
 
-An experimental new procedure is also implemented, requiring `n+2` samples instead of `2n+1` samples.
+An experimental new procedure is also implemented, requiring $(n+2)$ samples instead of $(2n+1)$ samples.
 
 ## Exported functions
 
@@ -67,7 +67,7 @@ The module `SamplingUnderestimators` exports several functions, with the followi
   - Must be convex, otherwise the generated results will be meaningless; our implementation treats `f` as a black box and cannot verify convexity. 
   - In the remainder of this section, `T` will denote the type of `f`'s input (either `Vector{Float64}` or `Float64`).
 
-- `xL::T` and `xU::T`: specify the box domain on which `f` is defined. A vector `x` is considered to be inside this box if `xL<=x<=xU`.
+- `xL::T` and `xU::T`: specify the box domain on which `f` is defined. A vector `x` is considered to be inside this box if `xL .<= x .<= xU`.
 
 The following functions are exported by `SamplingUnderestimators`:
 
