@@ -17,7 +17,7 @@ f(x) = dot(x, A, x) + dot(b, x) + c
 ```
 on the box domain: `xL[i] <= x[i] <= xU[i]` for `i` in `1:2`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
-First, let's load the module:
+First, let's load the module. With [SamplingUnderestimators.jl](src/SamplingUnderestimators.jl) in your working directory, enter the following in Julia's REPL:
 ```julia
 include("SamplingUnderestimators.jl")
 using .SamplingUnderestimators
@@ -52,7 +52,7 @@ Note that if the `plot_sampling_underestimator` function is entered directly in 
 
 ## Method outline
 
-Suppose we have a convex function $f$ of $n$ variables, defined on a box domain $X = [\mathbf{x}^L, \mathbf{x}^U]$. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples $f$ at $(2n+1)$ domain points: the midpoint of $x$, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for $f$ on $X$. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of $f$ at the midpoint of $X$. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
+Suppose we have a convex function $f$ of $n$ variables, defined on a box domain $X = [\mathbf{x}^L, \mathbf{x}^U]$. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples $f$ at $(2n+1)$ domain points: the midpoint of $X$, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for $f$ on $X$. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of $f$ at the midpoint of $X$. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
 
 As in our paper, this implementation also allows for absolute error in evaluating $f$, and for off-center sampling stencils. When $n=1$, we additionally exploit the fact that each domain point is collinear with all three sampled points.
 
