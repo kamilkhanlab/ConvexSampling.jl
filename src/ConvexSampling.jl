@@ -193,11 +193,11 @@ function eval_sampling_underestimator_coeffs(
 
     #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
-        sM = yPlus - yMinus 
-        sR = yPlus - 2.0*y0 + yMinus + 4.0*epsilon*n
+        sM = @. yPlus - yMinus 
+        sR = @. yPlus - 2.0*y0 + yMinus + 4.0*epsilon*n
 
         for i in range(1,n) 
-            yJSum = sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0)
+            yJsum = sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0)
             sM[i] += yJsum 
             sR[i] -= yJsum
         end #for
@@ -205,8 +205,8 @@ function eval_sampling_underestimator_coeffs(
         b = @. sM/abs(2.0*wStep) 
 
         #coefficient c calculated as affineFunc(w0):
-        sR = @. sR/abs(2.0*wStep)*(1 + abs(lambda))
-        c = @. y0 - 0.5*dot(sR, xU - xL) + epsilon #TODO: pending felix on epsilon 
+        sR = @. (sR/abs(2.0*wStep))*(1 + abs(lambda))
+        c = y0 - 0.5*dot(sR, xU - xL) - epsilon
 
     else
         throw(DomainError(:samplingPolicy, "unsupported sampling method"))
@@ -386,7 +386,7 @@ function eval_sampling_lower_bound(
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
         w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU;
                                                            samplingPolicy, alpha, lambda, epsilon)
-        fL = y0 - 0.5*dot(abs.(b), abs.(xU - xL)) - 0.5*dot(sR, xU - xL)
+        fL = f(w0) - 0.5*dot(abs.(b), abs.(xU - xL)) - 0.5*dot(sR, xU - xL)
     elseif samplingPolicy == SAMPLE_COMPASS_STAR
         w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
                                                               samplingPolicy, alpha, lambda, epsilon)
