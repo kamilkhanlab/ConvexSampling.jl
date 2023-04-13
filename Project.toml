@@ -1,6 +1,6 @@
 name = "ConvexSampling"
 uuid = "11d2b6ea-33ce-4b4d-a547-2ef600a65ac9"
-authors = ["Maha Chaudhry"]
+authors = ["Maha Chaudhry", "Kamil Khan"]
 version = "0.1.0"
 
 [deps]

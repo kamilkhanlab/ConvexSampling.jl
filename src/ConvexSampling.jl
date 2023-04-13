@@ -191,19 +191,22 @@ function eval_sampling_underestimator_coeffs(
         end #if
         sR = Array{Float64}(undef, n, 1)
 
-        #alternate calculation for b and c vectors assuming n+2 sampled points:
+    #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
-        sU = @. 2.0*(yPlus - y0)/abs(2.0*wStep)
-        sL = zeros(n)
-        for (i, wStepI) in zip(eachindex(sL), wStep)
-            yjSum = sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0)
-            sL[i] = 2.0*(y0 - yMinus[1] + yjSum)/abs(2.0*wStepI)
+        sM = yPlus - yMinus 
+        sR = yPlus - 2.0*y0 + yMinus + 4.0*epsilon*n
+
+        for i in range(1,n) 
+            yJSum = sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0)
+            sM[i] += yJsum 
+            sR[i] -= yJsum
         end #for
-        b = 0.5.*(sL + sU)
+
+        b = @. sM/abs(2.0*wStep) 
 
         #coefficient c calculated as affineFunc(w0):
-        sR = 0.5.*(sU - sL)
-        c = y0 - 0.5.*dot(sR, xU - xL)
+        sR = @. sR/abs(2.0*wStep)*(1 + abs(lambda))
+        c = @. y0 - 0.5*dot(sR, xU - xL) + epsilon #TODO: pending felix on epsilon 
 
     else
         throw(DomainError(:samplingPolicy, "unsupported sampling method"))
