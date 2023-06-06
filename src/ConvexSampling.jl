@@ -384,12 +384,21 @@ function eval_sampling_lower_bound(
                      (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
                      (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
-        w0, b, c, sR = eval_sampling_underestimator_coeffs(f, xL, xU;
-                                                           samplingPolicy, alpha, lambda, epsilon)
-        fL = f(w0) - 0.5*dot(abs.(b), abs.(xU - xL)) - 0.5*dot(sR, xU - xL)
+        w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;samplingPolicy, alpha, lambda, epsilon)
+                                                    
+        yjSum = zeros(n)
+        yjSum = [sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0) for i in (1:n)]
+        
+        fL = y0 - epsilon
+        yneg = zeros(n)
+        yneg = [yMinus[1] for i in (1:n)]
+
+        fL -= sum((1.0 .+ abs.(lambda)).*(max.(yPlus, yneg.-yjSum) .- y0 .+ 2.0*epsilon*n)./alpha; init=0.0)
+        #fL = y0 - 0.5*dot(abs.(b), abs.(xU - xL)) - 0.5*dot(sR.*(1.0 .+ abs.(lambda)), xU - xL)
     elseif samplingPolicy == SAMPLE_COMPASS_STAR
         w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
                                                               samplingPolicy, alpha, lambda, epsilon)
+
         fL = y0 - epsilon
         fL -= sum((1.0 .+ abs.(lambda)).*(max.(yPlus, yMinus) .- y0 .+ 2.0*epsilon)./alpha; init=0.0)
     else
