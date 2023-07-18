@@ -229,7 +229,7 @@ function eval_sampling_underestimator_coeffs(
     w0Vec, bVec, c, sR =
         eval_sampling_underestimator_coeffs(fMultiVar, [xL], [xU];
                                             samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
-    return w0Vec[1], b[1], c, sR[1]
+    return w0Vec[1], bVec[1], c, sR[1]
 end #function
 
 # define affine underestimator function using calculated b, c coefficients:
