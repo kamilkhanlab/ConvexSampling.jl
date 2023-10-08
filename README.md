@@ -63,8 +63,8 @@ An experimental new procedure is also implemented, requiring $(n+2)$ samples ins
 The module `SamplingUnderestimators` exports several functions, with the following common inputs:
 
 - `f::Function`: the convex function to be sampled and underestimated.
-  - Must have either the signature `f(x::Vector{Float64})::Float64` or `f(x::Float64)::Float64`. 
-  - Must be convex, otherwise the generated results will be meaningless; our implementation treats `f` as a black box and cannot verify convexity. 
+  - Must have either the signature `f(x::Vector{Float64})::Float64` or `f(x::Float64)::Float64`.
+  - Must be convex, otherwise the generated results will be meaningless; our implementation treats `f` as a black box and cannot verify convexity.
   - In the remainder of this section, `T` will denote the type of `f`'s input (either `Vector{Float64}` or `Float64`).
 
 - `xL::T` and `xU::T`: specify the box domain on which `f` is defined. A vector `x` is considered to be inside this box if `xL .<= x .<= xU`.
@@ -72,7 +72,7 @@ The module `SamplingUnderestimators` exports several functions, with the followi
 The following functions are exported by `SamplingUnderestimators`:
 
 - `(w0::T, b::T, c::Float64, sR::T) = eval_sampling_underestimator_coeffs(f, xL, xU)`:
-  - evaluates coefficients for which the affine function `x -> c + dot(b, x - w0)` is guaranteed to underestimate `f` on `[xL, xU]`. 
+  - evaluates coefficients for which the affine function `x -> c + dot(b, x - w0)` is guaranteed to underestimate `f` on `[xL, xU]`.
   - The function `f` is sampled `2n+1` times by default.
   - The additional output `sR` is only used by our experimental method that samples `f` fewer times.
 

@@ -10,11 +10,12 @@ An alternate method under construction has also been implemented to evaluate
 the function with fewer sample points.
 =#
 
-include("../src/SamplingUnderestimators.jl")
+include("../src/ConvexSampling.jl")
 
-using .SamplingUnderestimators
+using .ConvexSampling
 using LinearAlgebra
 using Plots
+using Test
 
 ##
 println("Running Example 1: A function with 1 variable:\n")
@@ -63,6 +64,8 @@ f3(x) = dot(x,[66 36 30; 36 33 36; 30 36 66],x) + dot([6; 2; 6],x) + 23
 xL = [-5.0, -2.0, -1.0]
 xU = [6.0, 3.0, 7.0]
 println("Function: f3(x) = dot(x,(",[66 36 30; 36 33 36; 30 36 66],"),x) + dot(",[6;2;6],",x) + ",23," \n with bounds x = ",xL," and ",xU,".\n")
+
+display(sample_convex_function(f3, xL, xU))
 
 _, bcoeff3, ccoeff3 = eval_sampling_underestimator_coeffs(f3, xL, xU)
 println("Calculated b and c coefficients are ", bcoeff3, " and ", ccoeff3, " respectively.\n")
