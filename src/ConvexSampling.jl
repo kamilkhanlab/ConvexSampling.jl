@@ -71,7 +71,7 @@ function sample_convex_function(
     if length(xU) != length(xL)
         throw(DomainError("xL and xU", "must have the same dimension"))
     end #if
-    if !(xL <= xU)
+    if any(xL .> xU)
         throw(DomainError("xL and xU", "must have xL[i]<=xU[i] for each i"))
     end #if
     if !all(0.0 .< alpha .<= (1.0 .- lambda))
@@ -172,12 +172,7 @@ function eval_sampling_underestimator_coeffs(
                                                           samplingPolicy, alpha, lambda, epsilon)
 
     if n == 1 || samplingPolicy == SAMPLE_COMPASS_STAR
-        b = zeros(n)
-        for (i, xLI, xUI, yPlusI, yMinusI, wStepI) in zip(eachindex(b), xL, xU, yPlus, yMinus, wStep)
-            if xLI < xUI
-                b[i] = (yPlusI - yMinusI)/abs(2.0*wStepI)
-            end
-        end #for
+        b = @. (xL < xU) * (yPlus - yMinus)/abs(2.0*wStep)
 
         #coefficient c can be tightened in special cases where f is univariate
         #dependent on the defined step length:
@@ -189,7 +184,7 @@ function eval_sampling_underestimator_coeffs(
         elseif n == 1 && alpha != [1.0]
             c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
         end #if
-        sR = Array{Float64}(undef, n, 1)
+        sR = similar(b)
 
     #alternate calculation for b and c vectors assuming n+2 sampled points:
     elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
@@ -459,7 +454,7 @@ function plot_sampling_underestimator(
     plot3DStyle::Vector = [surface!, wireframe!, surface], #Set plot style
     fEvalResolution::Int64 = 10 #Set # of function evaluations as points^n
 )
-    if !(xU > xL)
+    if any(xL .>= xU
         throw(DomainError("xL and xU", "for plotting, we must have xU[i] > xL[i] for each i"))
     end
 
