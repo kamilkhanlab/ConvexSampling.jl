@@ -15,132 +15,171 @@ has also been implemented, which uses n+2 evaluations.
 
 ...
 
-Written by Maha Chaudhry on July 4, 2022
-Edited by Kamil Khan
+Written by Maha Chaudhry and Kamil Khan
 =#
 module ConvexSampling
 
 using LinearAlgebra
 using Plots
 
-export SamplingType, SAMPLE_COMPASS_STAR, SAMPLE_SIMPLEX_STAR,
-    eval_sampling_underestimator_coeffs,
-    construct_sampling_underestimator,
-    eval_sampling_underestimator,
-    eval_sampling_lower_bound,
-    plot_sampling_underestimator,
-    sample_convex_function
+export SampledData
+
+export sample_convex_function,
+    evaluate_underestimator_coeffs,
+    construct_underestimator,
+    evaluate_underestimator,
+    evaluate_lower_bound,
+    plot_sampling_underestimator
 
 ## define affine under-estimator function operations, given a convex function f
 ## defined on a box domain with a Vector input
-
-# implemented sampling procedures
-#   In comments, n=domain of provided convex function.
-"""
-An enum that specifies the sampling strategy and the number of evaluations of f.
-
-# Possible Values
-- `SAMPLE_COMPASS_STAR`: (default value), uses `(2n+1)` function evaluations in a
-                        compass-star stencil, where `n` is domain dimension of `f`.
-- `SAMPLE_SIMPLEX_STAR`: uses (n+2) evaluations; this is experimental,
-                        and does not currently utilize lambda or epsilon.
-
-"""
-@enum SamplingType begin
-    SAMPLE_COMPASS_STAR # sample (2n+1) points, as by Song et al. (2021)
-    SAMPLE_SIMPLEX_STAR # sample (n+2) points, in an experimental procedure
-end
 
 # default dimensionless stepsize.
 #   Smaller is generally better, but pushing alpha too small
 #   will leave us vulnerable to numerical error in subtraction
 const DEFAULT_ALPHA = 0.1
 
+"""
+A `SampledData{T}` object holds sampled values of a supplied convex function, along with associated metadata. The parameter `T` is the function's input type, and may take the following values:
+
+- `T = Float64` is for univariate functions only (with domain dimension 1), and
+- `T = Vector{Float64}` is for multivariate functions only (with domain dimension >= 2).
+
+The value of `T` affects the formulas used by other methods in this package, since univariate convex functions have access to tighter sampling-based underestimators.
+
+# Fields of SampledData{T}
+
+- `f:Function`: must be convex and with the signature `f(x::T) -> Float64`; this implementation treats `f` as a black box and cannot verify convexity
+- `xL::T`: coordinates for lower bound of box domain on which `f` is defined
+- `xU::T`: coordinates for upper bound of box domain on which `f` is defined
+- `stencilShape::Symbol`: specifies shape of stencil on which `f` is sampled.
+- `alpha::T`: dimensionless step length of each sampled point from stencil centre `w0`.
+    Each component `alpha[i]` must satisfy `0.0 < alpha[i] <= 1.0 - lambda[i]``,
+    and is set to `0.1` by default. If the step length is too small, then subtraction
+    operations in finite difference formulas might cause unacceptable numerical error.
+- `lambda::T`: scaled offset of the center of the sampling stencil, relative to the center of the box domain of `f`. All components of `lambda` must be between
+    `(-1.0, 1.0)`, and are `0.0` by default.
+- `epsilon::Float64`: an absolute error bound for evaluations of `f`. We presume that
+    each numerical evaluation of `f(x)` is within `epsilon` of the true value.
+    Set to `0.0` by default.
+- `w0::T`: center of sampling stencil in the domain of `f`
+- `wStep::T`: contains a perturbation distance in each coordinate direction, to generate the remaining points in the sampling stencil from `w0`
+- `y0::Float64 = f(w0)`
+- `yPlus` and `yMinus`: contains values of `f` at points in sampling stencil other than `w0`.
+"""
+struct SampledData{T}
+    xL::T
+    xU::T
+    stencilShape::Symbol
+    alpha::T
+    lambda::T
+    epsilon::T
+    w0::T
+    wStep::T
+    y0::Float64
+    yPlus::Vector{Float64}
+    yMinus::Vector{Float64}
+end
+
 # sample convex function, to later generate affine underestimators.
 #   Notation is as in Song et al. (2021).
 function sample_convex_function(
-    f::Function, # must be convex and of the form f(x::Vector{Float64})::Float64
-    xL::Vector{Float64},
-    xU::Vector{Float64};
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
-    lambda::Vector{Float64} = zeros(length(xL)), # dimensionless offset of sampling stencil
-    epsilon::Float64 = 0.0 # absolute error in evaluating f
+    f::Function,
+    xL::Float64,
+    xU::Float64;
+    alpha::Float64 = DEFAULT_ALPHA,
+    lambda::Float64 = 0.0,
+    epsilon::Float64 = 0.0
 )
     # verify consistency of inputs
-    if length(xU) != length(xL)
-        throw(DomainError("xL and xU", "must have the same dimension"))
-    end #if
-    if any(xL .> xU)
-        throw(DomainError("xL and xU", "must have xL[i]<=xU[i] for each i"))
-    end #if
-    if !all(0.0 .< alpha .<= (1.0 .- lambda))
-        throw(DomainError(:alpha, "each component must be between 0.0 and (1.0-lambda)"))
-    end #if
-    if !all(-1.0 .< lambda .< 1.0)
-        throw(DomainError(:lambda, "each component must be between -1.0 and 1.0"))
-    end #if
+    (xU > xL) ||
+        throw(DomainError(:xU, "must satisfy xL < xU"))
+    
+    (-1.0 < lambda < 1.0) ||
+        throw(DomainError(:lambda, "must satisfy -1.0 < lambda < 1.0"))
+    
+    (0.0 < alpha <= (1.0 - lambda)) ||
+        throw(DomainError(:alpha, "must satisfy 0.0 < alpha <= (1.0 - lambda)"))
+
+    # sample midpoint of stencil
+    w0 = 0.5*(xL + xU + lambda*(xU - xL))
+    y0 = f(w0)
+    
+    (y0 isa Float64) ||
+        throw(DomainError(:f, "function's output must be Float64"))
+
+    # sample other points in stencil
+    wStep = 0.5*alpha*(xU - xL)
+    yPlus = [f(w0 + wStep)]
+    yMinus = [f(w0 - wStep)]
+
+    # pack samples into a SampledData object
+    return SampledData{Float64}(
+        xL, xU, :compass, alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus
+    )
+end
+
+function sample_convex_function(
+    f::Function,
+    xL::Vector{Float64},
+    xU::Vector{Float64};
+    stencilShape::Symbol = :compass,
+    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
+    lambda::Vector{Float64} = zeros(length(xL)),
+    epsilon::Float64 = 0.0
+)
+    # verify consistency of inputs
+    (length(xL) >= 2) ||
+        throw(DomainError(:xL, "Univariate functions must be provided with the signature f(x::Float64) -> Float64."))
+    
+    (length(xL) == length(xU) == length(alpha) == length(lambda)) ||
+        throw(DomainError("xL, xU, alpha, lambda", "must all have the same number of components"))
+    
+    all(xL .<= xU) ||
+        throw(DomainError(:xU, "must satisfy xL[i] <= xU[i] for each i"))
+
+    all(-1.0 .< lambda .< 1.0) ||
+        throw(DomainError(:lambda, "must satisfy -1.0 < lambda[i] < 1.0 for each i"))
+
+    all(0.0 .< alpha .<= (1.0 .- lambda)) ||
+        throw(DomainError(:xU, "must satisfy 0.0 < alpha[i] <= (1.0 - lambda[i]) for each i"))
 
     # sample midpoint of stencil
     w0 = @. 0.5*(xL + xU) + 0.5*lambda*(xU - xL)
     y0 = f(w0)
-    if !(y0 isa Float64)
+    
+    (y0 isa Float64) ||
         throw(DomainError(:f, "function output must be scalar Float64"))
-    end #if
 
     # sample other points in stencil
     wStep = @. 0.5*alpha*(xU - xL)
     wStepDiag = Diagonal(wStep)
     yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ wStepDiag)]
-    if samplingPolicy == SAMPLE_COMPASS_STAR
+    
+    if stencilShape == :compass
         yMinus = [f(wMinus) for wMinus in eachcol(w0 .- wStepDiag)]
-    elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
+    elseif stencilShape == :simplex
         yMinus = [f(w0 - wStep)]
     else
-        throw(DomainError(:samplingPolicy, "unsupported sampling method"))
-    end # if
-    return w0, y0, wStep, yPlus, yMinus
-end #function
+        throw(DomainError(:stencilShape, "unsupported stencil shape"))
+    end
 
-# compute coefficients c, b, w0 so that:
-#   fAffine(x) = c + dot(b, x - w0)
-#   is an affine underestimator of f in the interval [xL, xU]
-#
-# The output sR is used by the experimental (n+2)-sampling method.
+    # pack samples into a SampledData object
+    return SampledData{Vector{Float64}}(
+        xL, xU, stencilShape, alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus
+    )
+end
+
 """
-	eval_sampling_underestimator_coeffs(args...; kwargs...)
+    (w0, b, c) = evaluate_underestimator_coeffs(data::SampledData)
 
-# Arguments
+Evaluates coefficients of an affine underestimator of a sampled convex function `f` on a specified interval domain `[xL, xU]`, based only on the sampled data generated by [sample_convex_function](@ref). 
 
-- `f:Function`: must be convex and of the form f(x::T)::Float64;
-    otherwise implementation treats `f` as a black box and cannot verify convexity
-- `xL::T`: coordinates for lower bound of box domain on which `f` is defined
-- `xU::T`: coordinates for upper bound of box domain on which `f` is defined
+Using the evaluated coefficients, if we define `fAffine(x) = c + dot(b, x - w0)`, then
+`fAffine(x) <= f(x)` whenever `all(xL .<= x .<= xU)`. `b` and `w0` have the same type as `x`.
 
-where T is either `Vector{Float64}` or `Float64`
+# Example (outdated)
 
-# Keywords
-
-- `samplingPolicy::SamplingType`: an `enum` specifying sampling strategy.
-    See [`SamplingType`](@ref SamplingType) for more details.
-- `lambda::T`: an offset of location of `w0` to employ sampling stencils where `w0`
-    is not the domain midpoint. All components of `lambda` must be between
-    `(-1.0, 1.0)`, and are `0.0` by default.
-- `alpha::T`: dimensionless step length of each sampled point from stencil centre `w0`.
-    Each component `alpha[i]` must satisfy `0.0 < alpha[i] <= 1.0 - lambda[i]``,
-    and is set to `0.1` by default. If the step length is too small, then subtraction
-    operations in our finite difference formulas might cause unacceptable numerical error.
-- `epsilon::Float64`: an absolute error bound for evaluations of `f`. We presume that
-    each numerical evaluation of `f(x)` is within `epsilon` of the true value.
-    Set to `0.0` by default.
-
-where T is either `Vector{Float64}` or `Float64`
-
-# Notes
-
-Additional output `sR` is only used by experimental method `SAMPLE_SIMPLEX_STAR`.
-
-# Example
 To construct the underestimator function for the function `f` on box domain
 `xL[i] <= x[i] <= xU[i]` for all `x` inputs:
 
@@ -151,92 +190,84 @@ c = 15.0
 f(x) = dot(x, A, x) + dot(b, x) + c
 xL = [-1.0, -2.0]
 xU = [3.0, 5.0]
-eval_sampling_underestimator_coeffs(f, xL, xU)
+evaluate_underestimator_coeffs(f, xL, xU)
 
 # output
 
 (w0, b, c) = ([1.0, 1.5], [123.99999999999991, 126.00000000000006], 134.125)
 ```
 """
-function eval_sampling_underestimator_coeffs(
-    f::Function,  # must be convex and of the form f(x::Vector{Float64})::Float64
-    xL::Vector{Float64},
-    xU::Vector{Float64};
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
-    lambda::Vector{Float64} = zeros(length(xL)), # dimensionless offset of sampling stencil
-    epsilon::Float64 = 0.0 # absolute error in evaluating f
-)
+function evaluate_underestimator_coeffs(data::SampledData{Float64})
+    # unpack
+    (xL, xU, alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus) =
+        (data.xL, data.xU, data.alpha, data.lambda, data.epsilon,
+         data.w0, data.wStep, data.y0, data.yPlus, data.yMinus)
+
+    # relabel for convenience
+    yPos = yPlus[1]
+    yNeg = yMinus[1]
+
+    # evaluate coefficients; we already know w0
+    b = (yPos - yNeg)/(2.0*wStep)
+    c = 2*y0 - 0.5*(yPos + yNeg) - epsilon*(3 + 0.5*(1 + abs(lambda))/alpha)
+
+    return (w0, b, c)
+end
+
+function evaluate_underestimator_coeffs(data::SampledData{Vector{Float64}})
+    # unpack
+    (xL, xU, stencilShape, alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus) =
+        (data.xL, data.xU, data.stencilShape, data.alpha, data.lambda, data.epsilon,
+         data.w0, data.wStep, data.y0, data.yPlus, data.yMinus)
+    
+    # evaluate coefficients; we already know w0. Formulas depend on stencil choice.
     n = length(xL)
-    w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
-                                                          samplingPolicy, alpha, lambda, epsilon)
+    
+    if stencilShape == :compass
+        b = zeros(n)
+        c = y0 - epsilon
+        for i in eachindex(b)
+            if wStep[i] > 0.0
+                b[i] = (yPlus[i] - yMinus[i])/abs(2.0*wStep[i])
+                c -= (1.0 + abs(lambda[i]))*(yPlus[i] + yMinus[i] - 2.0*y0 + 4.0*epsilon)
+            end
+        end
 
-    if n == 1 || samplingPolicy == SAMPLE_COMPASS_STAR
-        b = @. (xL < xU) * (yPlus - yMinus)/abs(2.0*wStep)
+    elseif stencilShape == :simplex
+        yNeg = yMinus[1]
+        ySum = sum(@. y0 - yPlus; init=0.0)
+        
+        sU = zeros(n)
+        sL = zeros(n)
+        for i in eachindex(sU)
+            if wStep[i] > 0.0
+                sU[i] = (yPlus[i] - y0)/wStep[i]
+                sL[i] = (yPlus[i] - yNeg + ySum)/wStep[i]
+            end
+        end
+        
+        b = 0.5*(sU + sL)
 
-        #coefficient c can be tightened in special cases where f is univariate
-        #dependent on the defined step length:
-        c = y0[1]
-        if n > 1
-            c -= epsilon
-            c -= sum((1.0 .+ abs.(lambda)).*(yPlus .+ yMinus
-                                             .- 2.0*y0 .+ 4.0*epsilon)./(2.0*alpha); init=0.0)
-        elseif n == 1 && alpha != [1.0]
-            c = 2.0*c - 0.5*(yPlus[1] + yMinus[1])
-        end #if
-        sR = similar(b)
-
-    #alternate calculation for b and c vectors assuming n+2 sampled points:
-    elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
-        sM = @. yPlus - yMinus 
-        sR = @. yPlus - 2.0*y0 + yMinus + 4.0*epsilon*n
-
-        for i in range(1,n) 
-            yJsum = sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0)
-            sM[i] += yJsum 
-            sR[i] -= yJsum
-        end #for
-
-        b = @. sM/abs(2.0*wStep) 
-
-        #coefficient c calculated as affineFunc(w0):
-        sR = @. (sR/abs(2.0*wStep))*(1 + abs(lambda))
-        c = y0 - 0.5*dot(sR, xU - xL) - epsilon
-
+        sR = 0.5*(sU - sL)
+        c = y0 - epsilon - 0.5*sum(@. (1.0 + abs(lambda))*sR*(xU - xL); init=0.0)
     else
-        throw(DomainError(:samplingPolicy, "unsupported sampling method"))
-    end #if
+        throw(DomainError(:stencilShape, "unsupported stencil shape"))
+    end
+    
+    return (w0, b, c)
+end
 
-    return w0, b, c, sR
-end #function
-
-# compute coefficients using scalar inputs for univariate functions:
-function eval_sampling_underestimator_coeffs(
-    f::Function, # must be convex and of the form f(x::Float64)::Float64
-    xL::Float64,
-    xU::Float64;
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Float64 = DEFAULT_ALPHA,
-    lambda::Float64 = 0.0,
-    epsilon::Float64 = 0.0
-)
-    fMultiVar(x) = f(x[1])
-    w0Vec, bVec, c, sR =
-        eval_sampling_underestimator_coeffs(fMultiVar, [xL], [xU];
-                                            samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
-    return w0Vec[1], bVec[1], c, sR[1]
-end #function
-
-# define affine underestimator function using calculated b, c coefficients:
 """
-    construct_sampling_underestimator(args...; kwargs...)
+    construct_underestimator(data::SampledData) -> Function
 
-Return affine underestimator function of the format `fAffine(x) = c + dot(b, x - w0)`
-by sampling function `f` at `2n+1` domain points where `n` is the function dimension.
+Same as [`evaluate_underestimator_coeffs`](@ref), but instead returns the underestimator as the function:
+```julia
+fAffine(x) = c + dot(b, x - w0)
+```
+With `f` denoting the originally sampled function, it then holds that `fAffine(x) <= f(x)` 
+whenever `all(xL .<= x .<= xU)`.
 
-See [`eval_sampling_underestimator_coeffs`](@ref eval_sampling_underestimator_coeffs) for more details on function inputs.
-
-# Example
+# Example (outdated)
 To construct the underestimator function for the function `f` on box domain
 `xL[i] <= x[i] <= xU[i]` for all `x` inputs:
 
@@ -247,50 +278,20 @@ c = 15.0
 f(x) = dot(x, A, x) + dot(b, x) + c
 xL = [-1.0, -2.0]
 xU = [3.0, 5.0]
-fAffine(x) = construct_sampling_underestimator(f, xL, xU)
+fAffine(x) = construct_underestimator(f, xL, xU)
 ```
 """
-function construct_sampling_underestimator(
-    f::Function,  # must be convex and of the form f(x::Vector{Float64})::Float64
-    xL::Vector{Float64},
-    xU::Vector{Float64};
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)), # dimensionless stepsize
-    lambda::Vector{Float64} = zeros(length(xL)), # dimensionless offset of sampling stencil
-    epsilon::Float64 = 0.0 # absolute error in evaluating f
-)
-    w0, b, c, _ = eval_sampling_underestimator_coeffs(f, xL, xU;
-                                                      samplingPolicy, alpha, lambda, epsilon)
-    return x -> c + dot(b, x - w0)
-end #function
+function construct_underestimator(data::SampledData{T}) where T
+    (w0, b, c) = evaluate_underestimator_coeffs(data)
+    return x::T -> c + dot(b, x - w0)
+end
 
-# define affine underestimator function using scalar inputs for univariate functions:
-function construct_sampling_underestimator(
-    f::Function, # must be convex and of the form f(x::Float64)::Float64
-    xL::Float64,
-    xU::Float64;
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Float64 = DEFAULT_ALPHA,
-    lambda::Float64 = 0.0,
-    epsilon::Float64 = 0.0
-)
-    fMultiVar(x) = f(x[1])
-    return construct_sampling_underestimator(fMultiVar, [xL], [xU];
-                                      samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
-end #function
-
-# compute affine underestimator y-value using:
-#  (1) computed affine underestimator function
-#  (2) x-input value
 """
-    eval_sampling_underestimator(args...; kwargs...)
+    evaluate_underestimator(data::SampledData, xIn) -> Float64
 
-Evaluate underestimator `fAffine` constructed by `construct_sampling_underestimator`
-at a domain point `xIn`. That is, `yOut = fAffine(xIn)`.
+Same as [`construct_underestimator`](@ref), but returns the value `fAffine(xIn)` instead of the underestimating function `fAffine`. Useful when `fAffine` will be evaluated only at one domain point.
 
-See [`eval_sampling_underestimator_coeffs`](@ref eval_sampling_underestimator_coeffs) for more details on function inputs.
-
-# Example
+# Example (outdated)
 
 ```Julia
 A = [25.0 24.0; 24.0 25.0]
@@ -299,51 +300,25 @@ c = 15.0
 f(x) = dot(x, A, x) + dot(b, x) + c
 xL = [-1.0, -2.0]
 xU = [3.0, 5.0]
-eval_sampling_underestimator(f, xL, xU, [2.0, 2.0])
+evaluate_underestimator(f, xL, xU, [2.0, 2.0])
 
 # output
 
 321.12499999999994
 ```
 """
-function eval_sampling_underestimator(
-    f::Function,
-    xL::Vector{Float64},
-    xU::Vector{Float64},
-    xIn::Vector{Float64}; #define x-input value
-    kwargs...
-)
-    fAffine = construct_sampling_underestimator(f, xL, xU; kwargs...)
-    return fAffine(xIn)
-end #function
+function evaluate_underestimator(data::SampledData{T}, xIn::T) where T
+    (w0, b, c) = evaluate_underestimator_coeffs(data)
+    return c + dot(b, xIn - w0)
+end
 
-# affine underestimator y-value using scalar inputs for univariate functions:
-function eval_sampling_underestimator(
-    f::Function,
-    xL::Float64,
-    xU::Float64,
-    xIn::Float64;
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Float64 = DEFAULT_ALPHA,
-    lambda::Float64 = 0.0,
-    epsilon::Float64 = 0.0
-)
-    fMultiVar(x) = f(x[1])
-    return eval_sampling_underestimator(fMultiVar, [xL], [xU], [xIn];
-                                 samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
-end #function
-
-# compute:
-#  fL = scalar lower bound of f on the interval [xL, xU]
 """
-    eval_sampling_lower_bound(args...; kwargs...)
+    fL = evaluate_lower_bound(data::SampledData)
 
-Compute the scalar lower bound of `f` on the interval `[xL, xU]`,
-so that `f(x) >= fL` for each `x` in the box.
+Compute a lower bound on a convex function `f` sampled by [sample_convex_function](@ref),
+so that `f(x) >= fL` whenenver `all(xL .<= x .<= xU)`.
 
-See [`eval_sampling_underestimator_coeffs`](@ref eval_sampling_underestimator_coeffs) for more details on function inputs.
-
-# Example
+# Example (outdated)
 
 ```Julia
 A = [25.0 24.0; 24.0 25.0]
@@ -359,74 +334,69 @@ eval_sampling_lower_bound(f, xL, xU)
 -554.875
 ```
 """
-function eval_sampling_lower_bound(
-    f::Function,
-    xL::Vector{Float64},
-    xU::Vector{Float64};
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Vector{Float64} = fill(DEFAULT_ALPHA, length(xL)),
-    lambda::Vector{Float64} = zeros(length(xL)),
-    epsilon::Float64 = 0.0
-)
-    n = length(xL)
+function evaluate_lower_bound(data::SampledData{Float64})
+    # TODO: account for non-default choices of lambda or epsilon
+    
+    # unpack
+    (xL, xU, alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus) =
+        (data.xL, data.xU, data.alpha, data.lambda, data.epsilon,
+         data.w0, data.wStep, data.y0, data.yPlus, data.yMinus)
+    
+    # relabel for convenience
+    yPos = yPlus[1]
+    yNeg = yMinus[1]
 
-    #coefficient c can be tightened in special cases where f is univariate:
-    if n == 1 && epsilon == 0.0 && lambda == zeros(n)
-        w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
-                                                              samplingPolicy, alpha, lambda, epsilon)
-        fL = (@. min(2.0*y0-yPlus,
-                     2.0*y0-yMinus,
-                     (1.0/alpha)*yMinus-((1.0-alpha)/alpha)*y0,
-                     (1.0/alpha)*yPlus-((1.0-alpha)/alpha)*y0))[1]
-    elseif samplingPolicy == SAMPLE_SIMPLEX_STAR
-        w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;samplingPolicy, alpha, lambda, epsilon)
-                                                    
-        yjSum = zeros(n)
-        yjSum = [sum(y0 - yPlusJ for (j, yPlusJ) in enumerate(yPlus) if j != i; init=0.0) for i in (1:n)]
+    # evaluate lower bound candidates, then choose the lowest of these
+    fLA = 2.0*y0 - yPos
+    fLB = 2.0*y0 - yNeg
+    fLC = y0 + (yNeg - y0)*(w0 - xL)/wStep
+    fLD = y0 + (yPos - y0)*(xU - w0)/wStep
+
+    return min(fLA, fLB, fLC, fLD)
+end
+
+function evaluate_lower_bound(data::SampledData{Vector{Float64}})
+    # unpack
+    (xL, xU, stencilShape, alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus) =
+        (data.xL, data.xU, data.stencilShape, data.alpha, data.lambda, data.epsilon,
+         data.w0, data.wStep, data.y0, data.yPlus, data.yMinus)
+    
+    # initialize at center of sampling stencil
+    fL = y0 - epsilon
+
+    # incorporate info from remaining samples in stencil
+    if stencilShape == :compass
+        for (i, alphaI) in enumerate(alpha)
+            if alphaI > 0.0
+                fL -= (1.0 + lambda[i])*(max(yPlus[i], yMinus[i]) - y0 + 2.0*epsilon)/alphaI
+            end
+        end
         
-        fL = y0 - epsilon
-        yneg = zeros(n)
-        yneg = [yMinus[1] for i in (1:n)]
+    elseif stencilShape == :simplex
+        yNeg = yMinus[1]
+        ySum = sum(@. y0 - yPlus; init=0.0)
+        n = length(xL)
 
-        fL -= sum((1.0 .+ abs.(lambda)).*(max.(yPlus, yneg.-yjSum) .- y0 .+ 2.0*epsilon*n)./alpha; init=0.0)
-        #fL = y0 - 0.5*dot(abs.(b), abs.(xU - xL)) - 0.5*dot(sR.*(1.0 .+ abs.(lambda)), xU - xL)
-    elseif samplingPolicy == SAMPLE_COMPASS_STAR
-        w0, y0, wStep, yPlus, yMinus = sample_convex_function(f, xL, xU;
-                                                              samplingPolicy, alpha, lambda, epsilon)
+        for (i, alphaI) in enumerate(alpha)
+            if alphaI > 0.0
+                fL -= (1.0 + lambda[i])*
+                    (max(yPlus[i], yNeg + y0 - yPlus[i] - ySum) - y0 + 2.0*epsilon*n)/alphaI
+            end
+        end
 
-        fL = y0 - epsilon
-        fL -= sum((1.0 .+ abs.(lambda)).*(max.(yPlus, yMinus) .- y0 .+ 2.0*epsilon)./alpha; init=0.0)
     else
-        throw(DomainError(:samplingPolicy, "unsupported sampling method"))
-    end #if
+        throw(DomainError(:stencilShape, "unsupported stencil shape"))
+    end
+    
     return fL
-end #function
+end
 
-# compute lower bound using scalar inputs for univariate functions:
-function eval_sampling_lower_bound(
-    f::Function,
-    xL::Float64,
-    xU::Float64;
-    samplingPolicy::SamplingType = SAMPLE_COMPASS_STAR,
-    alpha::Float64 = DEFAULT_ALPHA,
-    lambda::Float64 = 0.0,
-    epsilon::Float64 = 0.0
-)
-    fMultiVar(x) = f(x[1])
-    return eval_sampling_lower_bound(fMultiVar, [xL], [xU];
-                              samplingPolicy, alpha = [alpha], lambda = [lambda], epsilon)
-end #function
-
-# plot:
-#  function f on plane (R^n) within box domain
-#  lower bound fL on plane (R^n) within box domain
-#  affine underestimator on plane within box domain
-#  sampled points = (w0, y0) and (wi, yi)
+# TODO: update these plotting functions
 """
     plot_sampling_underestimator(args...; kwargs...)
 
 Plot (1) function, `f`, (2) affine underestimator, `fAffine`, and (3) lower bound `fL`
-on the box domain `[xL, xU]`.
+on the box domain `[xL, xU]`. 
 
 See [`eval_sampling_underestimator_coeffs`](@ref eval_sampling_underestimator_coeffs) for more details on function inputs.
 
