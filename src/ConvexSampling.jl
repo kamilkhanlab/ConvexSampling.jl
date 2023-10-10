@@ -1,21 +1,15 @@
 #=
 module SamplingUnderestimators
 =====================
-A quick implementation of:
+Implements the sampling-based underestimators of convex functions proposed in:
 
 - Bounding convex relaxations of process models from below by
 tractable black-box sampling, developed in the article:
 Song et al. (2021),
 https://doi.org/10.1016/j.compchemeng.2021.107413
+- Felix Bonhoff's master thesis, RWTH Aachen (2023)
 
-This implementation applies the formulae in this article to calculate affine
-relaxations of a convex function on a box domain on a box domain using
-    2n+1 function evaluations. An alternate method under construction
-has also been implemented, which uses n+2 evaluations.
-
-...
-
-Written by Maha Chaudhry and Kamil Khan
+Notation is as in the article by Song et al.
 =#
 module ConvexSampling
 
@@ -130,7 +124,7 @@ function sample_convex_function(
 )
     # verify consistency of inputs
     (length(xL) >= 2) ||
-        throw(DomainError(:xL, "Univariate functions must be provided with the signature f(x::Float64) -> Float64."))
+        throw(DomainError(:xL, "a provided function of one variable must have the signature f(x::Float64) -> Float64."))
     
     (length(xL) == length(xU) == length(alpha) == length(lambda)) ||
         throw(DomainError("xL, xU, alpha, lambda", "must all have the same number of components"))
@@ -149,19 +143,29 @@ function sample_convex_function(
     y0 = f(w0)
     
     (y0 isa Float64) ||
-        throw(DomainError(:f, "function output must be scalar Float64"))
+        throw(DomainError(:f, "provided function must produce Float64 outputs"))
 
     # sample other points in stencil
     wStep = @. 0.5*alpha*(xU - xL)
-    wStepDiag = Diagonal(wStep)
-    yPlus = [f(wPlus) for wPlus in eachcol(w0 .+ wStepDiag)]
-    
+    yPlus = fill(y0, length(w0))
     if stencilShape == :compass
-        yMinus = [f(wMinus) for wMinus in eachcol(w0 .- wStepDiag)]
+        yMinus = copy(yPlus)
     elseif stencilShape == :simplex
         yMinus = [f(w0 - wStep)]
     else
         throw(DomainError(:stencilShape, "unsupported stencil shape"))
+    end
+    wNew = copy(w0)
+    for i in eachindex(yPlus)
+        if wStep[i] != 0.0
+            wNew[i] = w0[i] + wStep[i]
+            yPlus[i] = f(wNew)
+            if stencilShape == :compass
+                wNew[i] = w0[i] - wStep[i]
+                yMinus[i] = f(wNew)
+            end
+            wNew[i] = w0[i]
+        end
     end
 
     # pack samples into a SampledData object
@@ -209,7 +213,8 @@ function evaluate_underestimator_coeffs(data::SampledData{Float64})
 
     # evaluate coefficients; we already know w0
     b = (yPos - yNeg)/(2.0*wStep)
-    c = 2*y0 - 0.5*(yPos + yNeg) - epsilon*(3 + 0.5*(1 + abs(lambda))/alpha)
+    c = 2.0*y0 - 0.5*(yPos + yNeg) - epsilon*(3.0 + (1.0 + abs(lambda))/alpha)
+    # TODO: perhaps this c can be increased
 
     return (w0, b, c)
 end
@@ -238,7 +243,7 @@ function evaluate_underestimator_coeffs(data::SampledData{Vector{Float64}})
         ySum = sum(@. y0 - yPlus; init=0.0)
         
         sU = zeros(n)
-        sL = zeros(n)
+        sL = copy(sU)
         for i in eachindex(sU)
             if wStep[i] > 0.0
                 sU[i] = (yPlus[i] - y0)/wStep[i]
