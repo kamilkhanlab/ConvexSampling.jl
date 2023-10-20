@@ -54,7 +54,7 @@ struct SampledData{T}
     stencil::Symbol
     alpha::T
     lambda::T
-    epsilon::T
+    epsilon::Float64
     iSet
     w0::T
     wStep::T
@@ -81,7 +81,7 @@ In the following input descriptions, you must use `T = Float64` if `n == 1`, and
 
 - `f::Function`: The convex function to be sampled and underestimated, with a signature of `f(x::T) -> Float64`. This implementation cannot verify convexity; if `f` is actually nonconvex, then the corresponding calculation results will be meaningless.
 - `xL::T` and `xU::T`: opposite corners of the box domain of `f`. A point `x::T` is considered to be in this domain if 
-`all(xL .<= x .<= x)`.
+`all(xL .<= x .<= xU)`.
 
 ## Optional keyword arguments
 
@@ -256,7 +256,7 @@ function evaluate_underestimator_coeffs(data::SampledData{Vector{Float64}})
         c = y0 - epsilon
         for i in iSet
             b[i] = (yPlus[i] - yMinus[i])/(2.0*wStep[i])
-            c -= (1.0 + abs(lambda[i]))*(yPlus[i] + yMinus[i] - 2.0*y0 + 4.0*epsilon)
+            c -= (1.0 + abs(lambda[i]))*(yPlus[i] + yMinus[i] - 2.0*y0 + 4.0*epsilon)/(2.0*alpha[i])
         end
 
     elseif stencil == :simplex
@@ -466,7 +466,7 @@ end
 function plot_underestimator(
     data::SampledData{Vector{Float64}},
     f::Function;
-    nMeshPoints::Int = 10
+    nMeshPoints::Int = 10,
     plotStyle::Vector = [surface!, wireframe!, surface]
 )
     # unpack
@@ -490,26 +490,27 @@ function plot_underestimator(
     yMeshAffine = [fAffine([x1, x2]) for x1 in x1Mesh, x2 in x2Mesh]
 
     # build plot
-    plot3DStyle[3](x1Mesh, x2Mesh,
+    plotStyle[3](x1Mesh, x2Mesh,
                    fill(fL, length(x1Mesh), length(x2Mesh)),
                    label = "lower bound", c=:PRGn_3)
     
-    plot3DStyle[2](x1Mesh, x2Mesh, yMeshAffine,
+    plotStyle[2](x1Mesh, x2Mesh, yMeshAffine,
                    label = "affine relaxation", c=:grays)
     
-    if plot3DStyle[1] == wireframe!
+    if plotStyle[1] == wireframe!
         colorBar = false
     else
         colorBar = true
     end
-    plot3DStyle[1](x1Mesh, x2Mesh, yMeshF, colorbar=colorBar,
+    plotStyle[1](x1Mesh, x2Mesh, yMeshF, colorbar=colorBar,
                    title="From top to bottom: (1) original function,
                     (2) affine underestimator, and (3) lower bound",
                    titlefontsize=10, xlabel = "x₁", ylabel = "x₂",
                    zlabel = "y", label = "f", c=:dense)
 
+    wPlus = w0 .+ diagm(wStep)
     if stencil == :compass
-        wMinus= w0 .- diagm(wStep)
+        wMinus = w0 .- diagm(wStep)
     elseif stencil == :simplex
         wMinus = w0 - wStep
     end
