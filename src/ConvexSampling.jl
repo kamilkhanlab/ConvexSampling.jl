@@ -43,7 +43,7 @@ The value of `T` affects the formulas used by other methods in this package, sin
 - `lambda::T`: as provided to [`sampled_convex_function`](@ref)
 - `epsilon::Float64`: as provided to [`sampled_convex_function`](@ref)
 - `iSet`: a collection that holds indices `i` for which `xU[i] > xL[i]`
-- `w0::T`: the center of sampling stencil in the domain of `f`
+- `w0::T`: center of the sampling stencil, in the domain of `f`
 - `wStep::T`: contains a perturbation distance in each coordinate direction, to generate the remaining points in the sampling stencil from `w0`
 - `y0::Float64 = f(w0)`
 - `yPlus` and `yMinus`: contain values of `f` at points in sampling stencil other than `w0`.
@@ -71,9 +71,9 @@ Given a convex function `f` of `n` variables in a box domain `[xL, xU]`,
 sample `f` `O(n)` times and store these samples as a [`SampledData`](@ref) object. 
 This information can then be used e.g. by the following tractable methods:
 
-- [`evaluate_underestimator_coeffs`](@ref): computes coefficients for an affine underestimator of `f`, 
-- [`construct_underestimator`](@ref): constructs this affine underestimator as a `Function`,
-- [`evaluate_lower_bound`](@ref): computes a constant lower bound of `f`.
+- [`evaluate_underestimator_coeffs`](@ref): to compute coefficients for an affine underestimator of `f`, 
+- [`construct_underestimator`](@ref): to construct this affine underestimator as a `Function`,
+- [`evaluate_lower_bound`](@ref): to compute a constant lower bound of `f`.
 
 # Inputs
 
