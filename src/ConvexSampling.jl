@@ -63,6 +63,10 @@ struct SampledData{T}
     yMinus::Vector{Float64}
 end
 
+# typedefs for convenience
+const UnivariateData = SampledData{Float64}
+const MultivariateData = SampledData{Vector{Float64}}
+
 """
     data::SampledData = sample_convex_function(f, xL, xU; 
                             stencil, alpha, lambda, epsilon)
@@ -130,7 +134,7 @@ function sample_convex_function(
     yMinus = [f(w0 - wStep)]
 
     # pack samples into a SampledData object
-    return SampledData{Float64}(
+    return UnivariateData(
         xL, xU, stencil, alpha, lambda, epsilon, [1], w0, wStep, y0, yPlus, yMinus
     )
 end
@@ -192,7 +196,7 @@ function sample_convex_function(
     end
 
     # pack samples into a SampledData object
-    return SampledData{Vector{Float64}}(
+    return MultivariateData(
         xL, xU, stencil, alpha, lambda, epsilon, iSet, w0, wStep, y0, yPlus, yMinus
     )
 end
@@ -224,7 +228,7 @@ evaluate_underestimator_coeffs(f, xL, xU)
 (w0, b, c) = ([1.0, 1.5], [123.99999999999991, 126.00000000000006], 134.125)
 ```
 """
-function evaluate_underestimator_coeffs(data::SampledData{Float64})
+function evaluate_underestimator_coeffs(data::UnivariateData)
     # unpack
     (alpha, lambda, epsilon, w0, wStep, y0, yPlus, yMinus) =
         (data.alpha, data.lambda, data.epsilon,
@@ -242,7 +246,7 @@ function evaluate_underestimator_coeffs(data::SampledData{Float64})
     return (w0, b, c)
 end
 
-function evaluate_underestimator_coeffs(data::SampledData{Vector{Float64}})
+function evaluate_underestimator_coeffs(data::MultivariateData)
     # unpack
     (xL, xU, stencil, alpha, lambda, epsilon, iSet, w0, wStep, y0, yPlus, yMinus) =
         (data.xL, data.xU, data.stencil, data.alpha, data.lambda, data.epsilon,
@@ -360,7 +364,7 @@ eval_sampling_lower_bound(f, xL, xU)
 -554.875
 ```
 """
-function evaluate_lower_bound(data::SampledData{Float64})
+function evaluate_lower_bound(data::UnivariateData)
     # unpack
     (alpha, lambda, epsilon, y0, yPlus, yMinus) =
         (data.alpha, data.lambda, data.epsilon, data.y0, data.yPlus, data.yMinus)
@@ -385,7 +389,7 @@ function evaluate_lower_bound(data::SampledData{Float64})
     return minimum(fLCandidates)
 end
 
-function evaluate_lower_bound(data::SampledData{Vector{Float64}})
+function evaluate_lower_bound(data::MultivariateData)
     # unpack
     (xL, xU, stencil, alpha, lambda, epsilon, iSet, w0, wStep, y0, yPlus, yMinus) =
         (data.xL, data.xU, data.stencil, data.alpha, data.lambda, data.epsilon,
@@ -440,7 +444,7 @@ See [`eval_sampling_underestimator_coeffs`](@ref) for more details on function i
 
 """
 function plot_underestimator(
-    data::SampledData{Float64},
+    data::UnivariateData,
     f::Function;
     nMeshPoints::Int = 10
 )
@@ -464,7 +468,7 @@ function plot_underestimator(
 end
 
 function plot_underestimator(
-    data::SampledData{Vector{Float64}},
+    data::MultivariateData,
     f::Function;
     nMeshPoints::Int = 10,
     plotStyle::Vector = [surface!, wireframe!, surface]
