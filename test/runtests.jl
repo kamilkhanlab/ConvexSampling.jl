@@ -1,5 +1,4 @@
-# get numbers from a second source - MATLAB?
-##
+# outdated
 include("../src/ConvexSampling.jl")
 
 using .ConvexSampling
