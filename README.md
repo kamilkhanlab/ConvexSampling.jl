@@ -20,6 +20,8 @@ Consider the following convex quadratic function `f`:
 A = [65.0 56.0; 56.0 65.0]
 b = [6.0, 2.0]
 c = 23.0
+
+using LinearAlgebra
 f(x) = dot(x, A, x) + dot(b, x) + c
 ```
 on the box domain: `xL .<= x .<= xU`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
