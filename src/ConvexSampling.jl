@@ -454,7 +454,7 @@ function plot_sampling_underestimator(
     plot3DStyle::Vector = [surface!, wireframe!, surface], #Set plot style
     fEvalResolution::Int64 = 10 #Set # of function evaluations as points^n
 )
-    if any(xL .>= xU
+    if any(xL .>= xU)
         throw(DomainError("xL and xU", "for plotting, we must have xU[i] > xL[i] for each i"))
     end
 
