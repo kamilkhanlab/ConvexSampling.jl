@@ -127,4 +127,10 @@ All exported functions also include the following optional keyword arguments, wi
 
 # References
 
-- Yingkai Song, Huiyi Cao, Chiral Mehta, and Kamil A. Khan, [Bounding convex relaxations of process models from below by tractable black-box sampling]( https://doi.org/10.1016/j.compchemeng.2021.107413), _Computers & Chemical Engineering_, 153:107413, 2021, DOI: 10.1016/j.compchemeng.2021.107413
+- Yingkai Song, Huiyi Cao, C. Mehta, and Kamil A. Khan, [Bounding
+  convex relaxations of process models from below by tractable
+  black-box sampling](
+  https://doi.org/10.1016/j.compchemeng.2021.107413), _Computers &
+  Chemical Engineering_, 153:107413, 2021, DOI:
+  10.1016/j.compchemeng.2021.107413
+- Felix Bonhoff, master's thesis, RWTH Aachen, 2023
