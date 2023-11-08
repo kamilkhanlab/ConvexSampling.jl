@@ -17,56 +17,57 @@ Now the package's module can be invoked with `using ConvexSampling`. This packag
 
 Consider the following convex quadratic function `f`: 
 ```Julia
+using LinearAlgebra
+
 A = [65.0 56.0; 56.0 65.0]
 b = [6.0, 2.0]
 c = 23.0
 
-using LinearAlgebra
 f(x) = dot(x, A, x) + dot(b, x) + c
 ```
 on the box domain: `xL .<= x .<= xU`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
-Once the package is installed, let's load its module. 
-```julia
-using ConvexSampling
-```
-
-Now, `f` can be sampled at either 5 domain points using the approach of Song et al.:
-```julia
-data = sample_convex_function(f, xL, xU; stencil=:compass)
-```
-or at 4 domain points using the approach of Bonhoff:
-```julia
-data = sample_convex_function(f, xL, xU; stencil=:simplex)
-```
-In general, for a function of `n` variables, `stencil=:compass` will sample this function `2n+1` times, while `stencil=:simplex` will sample it `n+2` times, but may ultimately yield a looser relaxation.
-
-Using the sampled information, we can construct a guaranteed affine underestimator of `f` on its box domain:
-```julia
-fAffine = construct_underestimator(data)
-```
-
-The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL .<= x .<= xU`. We can instead obtain this underestimator as its constant coefficients:
-```julia
-w0, b, c = evaluate_underestimator_coeffs(data)
-```
-in which case `fAffine(x) == c + dot(b, x - w0)` for all `x`. 
-
-We can also evaluate a guaranteed lower bound of `f` on its box domain:
-```julia
-fL = evaluate_lower_bound(data)
-```
-Then, we will have `f(x) >= fL` for each `x` in the domain.
-
-The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
-   ```Julia
-  graph = plot_sampling_underestimator(data)
-  @show graph
+1. Once the package is installed, we can load its module:
+   ```julia
+   using ConvexSampling
    ```
 
-![ConvexSampleplot](https://user-images.githubusercontent.com/104848815/173203263-26bdc553-c1b5-496a-913f-eeb0553461d7.png)
+2. Now, `f` can be sampled at either 5 domain points using the approach of Song et al.:
+   ```julia
+   data = sample_convex_function(f, xL, xU; stencil=:compass)
+   ```
+   or at 4 domain points using the approach of Bonhoff:
+   ```julia
+   data = sample_convex_function(f, xL, xU; stencil=:simplex)
+   ```
+   In general, for a function of `n` variables, `stencil=:compass` will sample this function `2n+1` times, while `stencil=:simplex` will sample it `n+2`    times, but may ultimately yield a looser relaxation.
 
-Note that if the `plot_sampling_underestimator` function is entered directly in the REPL, the `@show` command is not required.
+3. Using the sampled information, we can construct a guaranteed affine underestimator of `f` on its box domain:
+   ```julia
+   fAffine = construct_underestimator(data)
+   ```
+
+   The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL .<= x .<= xU`. We can instead obtain       this underestimator as its constant coefficients:
+   ```julia
+   w0, b, c = evaluate_underestimator_coeffs(data)
+   ```
+   in which case `fAffine(x) == c + dot(b, x - w0)` for all `x`. 
+
+   We can also evaluate a guaranteed lower bound of `f` on its box domain:
+   ```julia
+   fL = evaluate_lower_bound(data)
+   ```
+   Then, we will have `f(x) >= fL` for each `x` in the domain.
+
+4. The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
+      ```Julia
+     graph = plot_sampling_underestimator(data)
+     @show graph
+      ```
+
+   ![ConvexSampleplot](https://user-images.githubusercontent.com/104848815/173203263-26bdc553-c1b5-496a-913f-eeb0553461d7.png)
+
+   Note that if the `plot_sampling_underestimator` function is entered directly in the REPL, the `@show` command is not required.
 
 ## Method outline
 
