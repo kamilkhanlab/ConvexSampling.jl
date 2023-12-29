@@ -11,7 +11,7 @@ In the Julia REPL, enter the following command:
 import Pkg; Pkg.add(url="https://github.com/kamilkhanlab/ConvexSampling.jl")
 ```
 
-Now the package's module can be invoked with `using ConvexSampling`. This package is  under development, and its test invoked with `Pkg.test` is currently outdated.
+Now the package's module can be invoked with `using ConvexSampling`. The functionality of this package is intact, but its test invoked with `Pkg.test` is currently outdated.
 
 ## Example
 
@@ -25,7 +25,7 @@ c = 23.0
 
 f(x) = dot(x, A, x) + dot(b, x) + c
 ```
-on the box domain: `xL .<= x .<= xU`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
+on the box domain: `all(xL .<= x .<= xU)`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
 1. Once the package is installed, we can load its module:
    ```julia
@@ -47,7 +47,7 @@ on the box domain: `xL .<= x .<= xU`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3
    fAffine = construct_underestimator(data)
    ```
 
-   The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `xL .<= x .<= xU`. We can instead obtain       this underestimator as its constant coefficients:
+   The constructed function `fAffine` underestimates `f` on its box domain, so `fAffine(x) <= f(x)` whenever `all(xL .<= x .<= xU)`. We can instead obtain       this underestimator as its constant coefficients:
    ```julia
    w0, b, c = evaluate_underestimator_coeffs(data)
    ```
