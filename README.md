@@ -28,7 +28,7 @@ f(x) = dot(x, A, x) + dot(b, x) + c
 xL = [-5.0, -3.0]
 xU = [5.0, 3.0]
 ```
-on the box domain: `all(xL .<= x .<= xU)`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
+on the box domain: `all(xL .<= x .<= xU)`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
 1. Once the package is installed, we can load its module:
    ```julia
