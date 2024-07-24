@@ -11,7 +11,7 @@ In the Julia REPL, enter the following command:
 import Pkg; Pkg.add(url="https://github.com/kamilkhanlab/ConvexSampling.jl")
 ```
 
-Now the package's module can be invoked with `using ConvexSampling`. The functionality of this package is intact, but its test invoked with `Pkg.test` is currently outdated.
+Now the package's module can be invoked with `using ConvexSampling`. 
 
 ## Example
 
