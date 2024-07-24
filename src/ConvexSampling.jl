@@ -423,7 +423,7 @@ end
 
 # TODO: update these plotting functions
 """
-    plot_sampling_underestimator(args...; kwargs...)
+    plot_underestimator(data::SampledData, f; kwargs...)
 
 Plot (1) function, `f`, (2) affine underestimator, `fAffine`, and (3) lower bound `fL`
 on the box domain `[xL, xU]`. 
@@ -448,13 +448,14 @@ function plot_underestimator(
     f::Function;
     nMeshPoints::Int = 10
 )
-    if any(xL .>= xU)
-        throw(DomainError("xL and xU", "for plotting, we must have xU[i] > xL[i] for each i"))
-    end
 
     # unpack
     (xL, xU, w0, wStep, y0, yPlus, yMinus) =
         (data.xL, data.xU, data.w0, data.wStep, data.y0, data.yPlus, data.yMinus)
+
+    if any(xL .>= xU)
+        throw(DomainError("xL and xU", "for plotting, we must have xU[i] > xL[i] for each i"))
+    end
 
     # evaluate f and its underestimators
     fAffine = construct_underestimator(data)
