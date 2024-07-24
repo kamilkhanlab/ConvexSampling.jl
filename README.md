@@ -16,7 +16,7 @@ Now the package's module can be invoked with `using ConvexSampling`. The functio
 ## Example
 
 Consider the following convex quadratic function `f`: 
-```Julia
+```julia
 using LinearAlgebra
 
 A = [65.0 56.0; 56.0 65.0]
@@ -24,6 +24,9 @@ b = [6.0, 2.0]
 c = 23.0
 
 f(x) = dot(x, A, x) + dot(b, x) + c
+
+xL = [-5.0, -3.0]
+xU = [5.0, 3.0]
 ```
 on the box domain: `all(xL .<= x .<= xU)`, with `xL = [-5.0, -3.0]` and `xU = [5.0, 3.0]`. Suppose we wish to construct affine underestimators and/or lower bounds of `f` on its box domain.
 
@@ -60,8 +63,8 @@ on the box domain: `all(xL .<= x .<= xU)`, with `xL = [-5.0, -3.0]` and `xU = [5
    Then, we will have `f(x) >= fL` for each `x` in the domain.
 
 4. The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
-      ```Julia
-     graph = plot_sampling_underestimator(data)
+      ```julia
+     graph = plot_underestimator(data, f)
      @show graph
       ```
 
