@@ -2,7 +2,10 @@
 
 In [our recent paper](https://doi.org/10.1016/j.compchemeng.2021.107413), we presented a new approach for generating a guaranteed affine underestimator for a black-box convex function on a box domain, by tractable derivative-free sampling. Felix Bonhoff's master's thesis (RWTH Aachen, 2023) presented a variant of this approach that requires fewer samples.
 
-This repository provides a Julia v1.9 implementation of our new sampling approach.
+This repository provides a Julia implementation of our new sampling approach, tested in Julia v1.9. If you make use of this implementation in your own work, please cite the accompanying article:
+
+>   Yingkai Song, Huiyi Cao, C. Mehta, and Kamil A. Khan, Bounding convex relaxations of process models from below by tractable
+  black-box sampling, _Computers & Chemical Engineering_, **153**:107413 (2021). doi:10.1016/j.compchemeng.2021.107413
 
 ## Installation
 
@@ -45,7 +48,14 @@ on the box domain: `all(xL .<= x .<= xU)`. Suppose we wish to construct affine u
    ```
    In general, for a function of `n` variables, `stencil=:compass` will sample this function `2n+1` times, while `stencil=:simplex` will sample it `n+2`    times, but may ultimately yield a looser relaxation.
 
-3. Using the sampled information, we can construct a guaranteed affine underestimator of `f` on its box domain:
+   Our approach handles univariate and multivariate functions differently, so our implementation has Julia dispatch over `typeof(xL)`:
+      
+      - If `xL` is a `Float64`, then `f` must have the signature `f(x::Float64) -> Float64`, and our univariate formulas will be applied. Any univariate function must be entered this way.
+      - If `xL` is a `Vector{Float64}` with $\geq 2$ components, then `f` must have the signature `f(x::Vector{Float64}) -> Float64`, and our multivariate formulas will be applied.
+
+   Either way, `xU` must have the same type and number of components as `xL`.
+
+4. Using the sampled information, we can construct a guaranteed affine underestimator of `f` on its box domain:
    ```julia
    fAffine = construct_underestimator(data)
    ```
@@ -62,7 +72,7 @@ on the box domain: `all(xL .<= x .<= xU)`. Suppose we wish to construct affine u
    ```
    Then, we will have `f(x) >= fL` for each `x` in the domain.
 
-4. The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
+5. The function `f` may be plotted with its sampling-based underestimator `fAffine` and lower bound `fL`:
       ```julia
      graph = plot_underestimator(data, f)
      @show graph
@@ -74,7 +84,7 @@ on the box domain: `all(xL .<= x .<= xU)`. Suppose we wish to construct affine u
 
 ## Method outline
 
-Suppose we have a convex function $f$ of $n$ variables, defined on a box domain $X = [\mathbf{x}^L, \mathbf{x}^U]$. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples $f$ at $(2n+1)$ domain points: the midpoint of $X$, and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for $f$ on $X$. These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of $f$ at the midpoint of $X$. Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
+Suppose we have a convex function $f$ of $n$ variables, defined on a box domain $X = [\mathbf{x}^L, \mathbf{x}^U]$. Our [new underestimating approach](https://doi.org/10.1016/j.compchemeng.2021.107413) samples $f$ at $(2n+1)$ domain points: the midpoint of $X,$ and perturbations of this midpoint in each positive/negative coordinate direction. These sampled values are then tractably assembled using new finite difference formulas to yield guaranteed affine underestimators and guaranteed lower bounds for $f$ on $X.$ These underestimators are guaranteed by convex analysis theory; roughly, the sampled information is sufficient to infer a compact polyhedral set that encloses all subgradients of $f$ at the midpoint of $X.$ Using this information, we can deduce the "worst-case" convex functions that are consistent with the sampled data.
 
 As in our paper, this implementation also allows for absolute error in evaluating $f$, and for off-center sampling stencils. When $n=1$, we additionally exploit the fact that each domain point is collinear with all three sampled points.
 
